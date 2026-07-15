@@ -18,6 +18,12 @@
       "name": "Blank",
       "description": "Placeholder module (scaffold test)",
       "tags": ["Blank"]
+    },
+    {
+      "slug": "Solar50Drone",
+      "name": "Solar50Drone",
+      "description": "Simple sawtooth VCO with frequency knob, CV input, and CV attenuverter",
+      "tags": ["Oscillator", "VCO"]
     }
   ]
 }
