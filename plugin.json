@@ -22,8 +22,8 @@
     {
       "slug": "Solar50Drone",
       "name": "Solar50Drone",
-      "description": "Simple sawtooth VCO with frequency knob, CV input, and CV attenuverter",
-      "tags": ["Oscillator", "VCO"]
+      "description": "5-oscillator sawtooth drone VCO with per-oscillator frequency knobs, a shared CV input, and a CV attenuverter",
+      "tags": ["Oscillator", "VCO", "Drone"]
     }
   ]
 }
