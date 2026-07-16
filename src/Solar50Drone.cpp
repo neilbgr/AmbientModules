@@ -1,10 +1,9 @@
 #include "plugin.hpp"
 #include "dsp/AREnvelope.hpp"
+#include "dsp/DroneVoice.hpp"
 
 struct Solar50Drone : Module {
-    static const int NUM_OSC = 5;
-    static constexpr float DETUNE_MAX_OCTAVES = 2.f; // max detune at volt = -1
-    static constexpr float FM_DEPTH_OCTAVES = 1.f;   // max FM depth at volt = +1
+    static const int NUM_OSC = DroneVoice::NUM_OSC;
 
     enum ParamIds {
         ENUMS(FREQ_PARAM, NUM_OSC),
@@ -36,12 +35,10 @@ struct Solar50Drone : Module {
         NUM_LIGHTS
     };
 
-    float phase[NUM_OSC] = {};
-    float prevSaw[NUM_OSC] = {};
+    DroneVoice voice;
     dsp::SchmittTrigger trigTrigger[NUM_OSC];
     AREnvelope envelope;
     dsp::SchmittTrigger gateTrigger;
-    int fmTopology = 0; // 0 = average of active others, 1 = circular chain
 
     Solar50Drone() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -67,14 +64,14 @@ struct Solar50Drone : Module {
 
     json_t* dataToJson() override {
         json_t* rootJ = json_object();
-        json_object_set_new(rootJ, "fmTopology", json_integer(fmTopology));
+        json_object_set_new(rootJ, "fmTopology", json_integer(voice.fmTopology));
         return rootJ;
     }
 
     void dataFromJson(json_t* rootJ) override {
         json_t* fmTopologyJ = json_object_get(rootJ, "fmTopology");
         if (fmTopologyJ) {
-            fmTopology = json_integer_value(fmTopologyJ);
+            voice.fmTopology = json_integer_value(fmTopologyJ);
         }
     }
 
@@ -85,6 +82,7 @@ struct Solar50Drone : Module {
 
         bool active[NUM_OSC];
         bool mod[NUM_OSC];
+        float pitchParams[NUM_OSC];
         for (int i = 0; i < NUM_OSC; i++) {
             if (trigTrigger[i].process(inputs[TRIG_INPUT + i].getVoltage())) {
                 params[ACTIVE_PARAM + i].setValue(params[ACTIVE_PARAM + i].getValue() > 0.f ? 0.f : 1.f);
@@ -94,69 +92,16 @@ struct Solar50Drone : Module {
 
             mod[i] = params[MOD_PARAM + i].getValue() > 0.f;
             lights[MOD_LIGHT + i].setBrightness(mod[i] ? 1.f : 0.f);
+
+            pitchParams[i] = params[FREQ_PARAM + i].getValue();
         }
 
         // VOLT knob: negative half detunes all 5 oscillators down together;
         // positive half cross-modulates active oscillators (FM synthesis effect).
         // ±5V CV, added to the knob and clamped back into the knob's own -1..1 range.
         float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 5.f, -1.f, 1.f);
-        float detuneOctaves = std::fmin(volt, 0.f) * DETUNE_MAX_OCTAVES;
-        float fmAmount = std::fmax(volt, 0.f);
 
-        float mix = 0.f;
-        float newPrevSaw[NUM_OSC];
-        for (int i = 0; i < NUM_OSC; i++) {
-            float fmSource = 0.f;
-            if (fmAmount > 0.f) {
-                if (fmTopology == 0) {
-                    // Average of all other currently-active oscillators.
-                    float sum = 0.f;
-                    int count = 0;
-                    for (int j = 0; j < NUM_OSC; j++) {
-                        if (j != i && active[j]) {
-                            sum += prevSaw[j];
-                            count++;
-                        }
-                    }
-                    if (count > 0) {
-                        fmSource = sum / count;
-                    }
-                } else {
-                    // Circular chain, skipping inactive oscillators.
-                    int j = (i - 1 + NUM_OSC) % NUM_OSC;
-                    int guard = 0;
-                    while (!active[j] && j != i && guard < NUM_OSC) {
-                        j = (j - 1 + NUM_OSC) % NUM_OSC;
-                        guard++;
-                    }
-                    if (active[j] && j != i) {
-                        fmSource = prevSaw[j];
-                    }
-                }
-            }
-
-            float pitch = params[FREQ_PARAM + i].getValue() + (mod[i] ? cv : 0.f)
-                          + detuneOctaves + fmAmount * fmSource * FM_DEPTH_OCTAVES;
-
-            float freq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitch + 30.f) / std::pow(2.f, 30.f);
-            freq = clamp(freq, 0.f, args.sampleRate / 2.f);
-
-            // Phase keeps running even when inactive, so re-enabling an
-            // oscillator doesn't cause an audible phase jump.
-            float deltaPhase = std::fmin(freq * args.sampleTime, 0.5f);
-            phase[i] += deltaPhase;
-            phase[i] -= std::trunc(phase[i]);
-
-            float sawValue = 2.f * (phase[i] - std::round(phase[i])); // sawtooth naïf, pas d'anti-aliasing
-            newPrevSaw[i] = sawValue;
-
-            if (active[i]) {
-                mix += sawValue;
-            }
-        }
-        for (int i = 0; i < NUM_OSC; i++) {
-            prevSaw[i] = newPrevSaw[i];
-        }
+        float mix = voice.process(args.sampleTime, args.sampleRate, pitchParams, active, mod, cv, volt);
 
         gateTrigger.process(inputs[GATE_INPUT].getVoltage());
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
@@ -211,7 +156,7 @@ struct Solar50DroneWidget : ModuleWidget {
         assert(module);
 
         menu->addChild(new MenuSeparator);
-        menu->addChild(createIndexPtrSubmenuItem("FM topology", {"Average of active others", "Circular chain"}, &module->fmTopology));
+        menu->addChild(createIndexPtrSubmenuItem("FM topology", {"Average of active others", "Circular chain"}, &module->voice.fmTopology));
     }
 };
 
