@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "dsp/AREnvelope.hpp"
 
 struct Solar50Drone : Module {
     static const int NUM_OSC = 5;
@@ -8,25 +9,33 @@ struct Solar50Drone : Module {
         ENUMS(ACTIVE_PARAM, NUM_OSC),
         ENUMS(MOD_PARAM, NUM_OSC),
         ATTEN_PARAM,
+        HOLD_PARAM,
+        ATTACK_PARAM,
+        RELEASE_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
         CV_INPUT,
         ENUMS(TRIG_INPUT, NUM_OSC),
+        GATE_INPUT,
         NUM_INPUTS
     };
     enum OutputIds {
         SAW_OUTPUT,
+        ENV_OUTPUT,
         NUM_OUTPUTS
     };
     enum LightIds {
         ENUMS(ACTIVE_LIGHT, NUM_OSC),
         ENUMS(MOD_LIGHT, NUM_OSC),
+        HOLD_LIGHT,
         NUM_LIGHTS
     };
 
     float phase[NUM_OSC] = {};
     dsp::SchmittTrigger trigTrigger[NUM_OSC];
+    AREnvelope envelope;
+    dsp::SchmittTrigger gateTrigger;
 
     Solar50Drone() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -39,6 +48,12 @@ struct Solar50Drone : Module {
         configParam(ATTEN_PARAM, -1.f, 1.f, 0.f, "CV Attenuverter", "%", 0.f, 100.f);
         configInput(CV_INPUT, "Frequency CV (applies to all oscillators)");
         configOutput(SAW_OUTPUT, "Sawtooth mix");
+
+        configSwitch(HOLD_PARAM, 0.f, 1.f, 0.f, "Hold (manual gate)", {"Off", "On"});
+        configParam(ATTACK_PARAM, 0.f, 1.f, 0.2f, "Envelope attack");
+        configParam(RELEASE_PARAM, 0.f, 1.f, 0.2f, "Envelope release");
+        configInput(GATE_INPUT, "Envelope gate");
+        configOutput(ENV_OUTPUT, "Envelope");
     }
 
     void process(const ProcessArgs& args) override {
@@ -73,7 +88,16 @@ struct Solar50Drone : Module {
             }
         }
 
-        outputs[SAW_OUTPUT].setVoltage(5.f * mix / NUM_OSC);
+        gateTrigger.process(inputs[GATE_INPUT].getVoltage());
+        bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
+        bool gateHigh = gateTrigger.isHigh() || holdActive;
+        lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
+
+        envelope.updateCoefficients(params[ATTACK_PARAM].getValue(), params[RELEASE_PARAM].getValue());
+        float envValue = envelope.process(args.sampleTime, gateHigh);
+
+        outputs[ENV_OUTPUT].setVoltage(envValue * 10.f);
+        outputs[SAW_OUTPUT].setVoltage(5.f * mix / NUM_OSC * envValue);
     }
 };
 
@@ -99,6 +123,13 @@ struct Solar50DroneWidget : ModuleWidget {
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(36.f, 75.f)), module, Solar50Drone::CV_INPUT));
         addParam(createParamCentered<Trimpot>(mm2px(Vec(48.f, 75.f)), module, Solar50Drone::ATTEN_PARAM));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.8f, 108.f)), module, Solar50Drone::SAW_OUTPUT));
+
+        // Envelope section — placeholder coordinates, panel layout still WIP in Inkscape.
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(8.f, 90.f)), module, Solar50Drone::GATE_INPUT));
+        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(18.f, 90.f)), module, Solar50Drone::HOLD_PARAM, Solar50Drone::HOLD_LIGHT));
+        addParam(createParamCentered<Trimpot>(mm2px(Vec(8.f, 105.f)), module, Solar50Drone::ATTACK_PARAM));
+        addParam(createParamCentered<Trimpot>(mm2px(Vec(18.f, 105.f)), module, Solar50Drone::RELEASE_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(8.f, 118.f)), module, Solar50Drone::ENV_OUTPUT));
     }
 };
 
