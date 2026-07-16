@@ -3,6 +3,8 @@
 
 struct Solar50Drone : Module {
     static const int NUM_OSC = 5;
+    static constexpr float DETUNE_MAX_OCTAVES = 2.f; // max detune at volt = -1
+    static constexpr float FM_DEPTH_OCTAVES = 1.f;   // max FM depth at volt = +1
 
     enum ParamIds {
         ENUMS(FREQ_PARAM, NUM_OSC),
@@ -12,12 +14,14 @@ struct Solar50Drone : Module {
         HOLD_PARAM,
         ATTACK_PARAM,
         RELEASE_PARAM,
+        VOLT_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
         CV_INPUT,
         ENUMS(TRIG_INPUT, NUM_OSC),
         GATE_INPUT,
+        VOLT_CV_INPUT,
         NUM_INPUTS
     };
     enum OutputIds {
@@ -33,9 +37,11 @@ struct Solar50Drone : Module {
     };
 
     float phase[NUM_OSC] = {};
+    float prevSaw[NUM_OSC] = {};
     dsp::SchmittTrigger trigTrigger[NUM_OSC];
     AREnvelope envelope;
     dsp::SchmittTrigger gateTrigger;
+    int fmTopology = 0; // 0 = average of active others, 1 = circular chain
 
     Solar50Drone() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -54,6 +60,22 @@ struct Solar50Drone : Module {
         configParam(RELEASE_PARAM, 0.f, 1.f, 0.2f, "Envelope release");
         configInput(GATE_INPUT, "Envelope gate");
         configOutput(ENV_OUTPUT, "Envelope");
+
+        configParam(VOLT_PARAM, -1.f, 1.f, 0.f, "Volt (detune / FM)");
+        configInput(VOLT_CV_INPUT, "Volt CV");
+    }
+
+    json_t* dataToJson() override {
+        json_t* rootJ = json_object();
+        json_object_set_new(rootJ, "fmTopology", json_integer(fmTopology));
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override {
+        json_t* fmTopologyJ = json_object_get(rootJ, "fmTopology");
+        if (fmTopologyJ) {
+            fmTopology = json_integer_value(fmTopologyJ);
+        }
     }
 
     void process(const ProcessArgs& args) override {
@@ -61,18 +83,60 @@ struct Solar50Drone : Module {
         // all 5 frequencies together while preserving the intervals between them.
         float cv = inputs[CV_INPUT].getVoltage() * params[ATTEN_PARAM].getValue();
 
-        float mix = 0.f;
+        bool active[NUM_OSC];
+        bool mod[NUM_OSC];
         for (int i = 0; i < NUM_OSC; i++) {
             if (trigTrigger[i].process(inputs[TRIG_INPUT + i].getVoltage())) {
                 params[ACTIVE_PARAM + i].setValue(params[ACTIVE_PARAM + i].getValue() > 0.f ? 0.f : 1.f);
             }
-            bool active = params[ACTIVE_PARAM + i].getValue() > 0.f;
-            lights[ACTIVE_LIGHT + i].setBrightness(active ? 1.f : 0.f);
+            active[i] = params[ACTIVE_PARAM + i].getValue() > 0.f;
+            lights[ACTIVE_LIGHT + i].setBrightness(active[i] ? 1.f : 0.f);
 
-            bool mod = params[MOD_PARAM + i].getValue() > 0.f;
-            lights[MOD_LIGHT + i].setBrightness(mod ? 1.f : 0.f);
+            mod[i] = params[MOD_PARAM + i].getValue() > 0.f;
+            lights[MOD_LIGHT + i].setBrightness(mod[i] ? 1.f : 0.f);
+        }
 
-            float pitch = params[FREQ_PARAM + i].getValue() + (mod ? cv : 0.f);
+        // VOLT knob: negative half detunes all 5 oscillators down together;
+        // positive half cross-modulates active oscillators (FM synthesis effect).
+        // ±5V CV, added to the knob and clamped back into the knob's own -1..1 range.
+        float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 5.f, -1.f, 1.f);
+        float detuneOctaves = std::fmin(volt, 0.f) * DETUNE_MAX_OCTAVES;
+        float fmAmount = std::fmax(volt, 0.f);
+
+        float mix = 0.f;
+        float newPrevSaw[NUM_OSC];
+        for (int i = 0; i < NUM_OSC; i++) {
+            float fmSource = 0.f;
+            if (fmAmount > 0.f) {
+                if (fmTopology == 0) {
+                    // Average of all other currently-active oscillators.
+                    float sum = 0.f;
+                    int count = 0;
+                    for (int j = 0; j < NUM_OSC; j++) {
+                        if (j != i && active[j]) {
+                            sum += prevSaw[j];
+                            count++;
+                        }
+                    }
+                    if (count > 0) {
+                        fmSource = sum / count;
+                    }
+                } else {
+                    // Circular chain, skipping inactive oscillators.
+                    int j = (i - 1 + NUM_OSC) % NUM_OSC;
+                    int guard = 0;
+                    while (!active[j] && j != i && guard < NUM_OSC) {
+                        j = (j - 1 + NUM_OSC) % NUM_OSC;
+                        guard++;
+                    }
+                    if (active[j] && j != i) {
+                        fmSource = prevSaw[j];
+                    }
+                }
+            }
+
+            float pitch = params[FREQ_PARAM + i].getValue() + (mod[i] ? cv : 0.f)
+                          + detuneOctaves + fmAmount * fmSource * FM_DEPTH_OCTAVES;
 
             float freq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitch + 30.f) / std::pow(2.f, 30.f);
             freq = clamp(freq, 0.f, args.sampleRate / 2.f);
@@ -83,9 +147,15 @@ struct Solar50Drone : Module {
             phase[i] += deltaPhase;
             phase[i] -= std::trunc(phase[i]);
 
-            if (active) {
-                mix += 2.f * (phase[i] - std::round(phase[i])); // sawtooth naïf, pas d'anti-aliasing
+            float sawValue = 2.f * (phase[i] - std::round(phase[i])); // sawtooth naïf, pas d'anti-aliasing
+            newPrevSaw[i] = sawValue;
+
+            if (active[i]) {
+                mix += sawValue;
             }
+        }
+        for (int i = 0; i < NUM_OSC; i++) {
+            prevSaw[i] = newPrevSaw[i];
         }
 
         gateTrigger.process(inputs[GATE_INPUT].getVoltage());
@@ -130,6 +200,18 @@ struct Solar50DroneWidget : ModuleWidget {
         addParam(createParamCentered<Trimpot>(mm2px(Vec(8.f, 105.f)), module, Solar50Drone::ATTACK_PARAM));
         addParam(createParamCentered<Trimpot>(mm2px(Vec(18.f, 105.f)), module, Solar50Drone::RELEASE_PARAM));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(8.f, 118.f)), module, Solar50Drone::ENV_OUTPUT));
+
+        // VOLT knob — placeholder coordinates, panel layout still WIP in Inkscape.
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.f, 90.f)), module, Solar50Drone::VOLT_CV_INPUT));
+        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(36.f, 90.f)), module, Solar50Drone::VOLT_PARAM));
+    }
+
+    void appendContextMenu(Menu* menu) override {
+        Solar50Drone* module = dynamic_cast<Solar50Drone*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator);
+        menu->addChild(createIndexPtrSubmenuItem("FM topology", {"Average of active others", "Circular chain"}, &module->fmTopology));
     }
 };
 
