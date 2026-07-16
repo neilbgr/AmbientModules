@@ -30,6 +30,12 @@
       "name": "SolarLFO",
       "description": "Dual unipolar triangle/square LFO (slow A, fast B) with a brightness LED per LFO",
       "tags": ["LFO"]
+    },
+    {
+      "slug": "SolarVCO",
+      "name": "SolarVCO",
+      "description": "AS3340-style VCO with 6 waveforms (4 fixed + 2 morphing via shape), octave/sub/lin-exp switches, hard sync, and a full ADSR envelope with Hold and Self-generation",
+      "tags": ["VCO", "Oscillator", "Envelope generator"]
     }
   ]
 }
