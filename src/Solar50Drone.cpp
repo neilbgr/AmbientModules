@@ -148,7 +148,7 @@ struct Solar50DroneWidget : ModuleWidget {
 
         // VOLT knob — placeholder coordinates, panel layout still WIP in Inkscape.
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.f, 90.f)), module, Solar50Drone::VOLT_CV_INPUT));
-        addParam(createParamCentered<Rogan2PSBlue>(mm2px(Vec(36.f, 90.f)), module, Solar50Drone::VOLT_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(36.f, 90.f)), module, Solar50Drone::VOLT_PARAM));
     }
 
     void appendContextMenu(Menu* menu) override {

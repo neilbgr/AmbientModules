@@ -8,29 +8,26 @@ using namespace rack;
 struct AREnvelope {
     static constexpr float MIN_TIME = 0.001f; // 1 ms
     static constexpr float MAX_TIME = 15.f;   // 15 s, slow drone-style swells
+    static constexpr float LOG2_RATIO = 13.872675f; // log2(MAX_TIME / MIN_TIME)
 
     float out = 0.f;
     float attackLambda = 1.f / MIN_TIME;
     float releaseLambda = 1.f / MIN_TIME;
-    dsp::ClockDivider coeffDivider;
 
-    AREnvelope() {
-        coeffDivider.setDivision(16);
-    }
-
+    // Same +30/pow(2,30) trick as DroneVoice's pitch-to-freq: keeps the
+    // exponent argument non-negative for approxExp2_taylor5, cancelled out
+    // afterwards. std::pow(2.f, 30.f) has literal args so it's folded at
+    // compile time — no runtime powf call, unlike a direct std::pow(ratio, knob).
     static float lambdaFromKnob(float knobValue) {
         // knobValue in [0,1] -> time in seconds, exponential taper MIN_TIME..MAX_TIME
-        float time = MIN_TIME * std::pow(MAX_TIME / MIN_TIME, knobValue);
+        float time = MIN_TIME * dsp::approxExp2_taylor5(LOG2_RATIO * knobValue + 30.f) / std::pow(2.f, 30.f);
         return 1.f / time;
     }
 
-    // Call once per sample; only recomputes the lambdas (pow()) every
-    // coeffDivider.getDivision() samples.
+    // Cheap enough to call every sample directly — no throttling needed.
     void updateCoefficients(float attackKnob, float releaseKnob) {
-        if (coeffDivider.process()) {
-            attackLambda = lambdaFromKnob(attackKnob);
-            releaseLambda = lambdaFromKnob(releaseKnob);
-        }
+        attackLambda = lambdaFromKnob(attackKnob);
+        releaseLambda = lambdaFromKnob(releaseKnob);
     }
 
     // Returns the current envelope value in [0, 1].

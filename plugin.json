@@ -24,6 +24,12 @@
       "name": "Solar50Drone",
       "description": "5-oscillator sawtooth drone VCO with per-oscillator frequency knobs, a shared CV input, and a CV attenuverter",
       "tags": ["Oscillator", "VCO", "Drone"]
+    },
+    {
+      "slug": "SolarLFO",
+      "name": "SolarLFO",
+      "description": "Dual unipolar triangle/square LFO (slow A, fast B) with a brightness LED per LFO",
+      "tags": ["LFO"]
     }
   ]
 }
