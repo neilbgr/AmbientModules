@@ -20,36 +20,34 @@ struct SolarLFO : Module {
     
     TriSquareLFO lfoA, lfoB;
 
+    // Param value is in octaves (exponent of 2), not Hz directly — same convention
+    // as Fundamental's LFO-1/2 — so the knob's rotation is spread evenly across
+    // the audible range instead of being crammed into the high end. -8..10 octaves
+    // matches Fundamental's 0.0039..1024 Hz range exactly (2^-8 .. 2^10).
+    static constexpr float RATE_MIN_OCT = -8.f;
+    static constexpr float RATE_MAX_OCT = 10.f;
+
+    static float octavesToHz(float octaves) {
+        return dsp::approxExp2_taylor5(octaves + 30.f) / std::pow(2.f, 30.f);
+    }
+
     SolarLFO() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
-        configParam(RATE_A_PARAM, 0.f, 1.f, 0.5f, "LFO A rate");
-        configParam(WAVE_A_PARAM, 0.f, 1.f, 0.5f, "LFO A wave (square..triangle)");
+        configParam(RATE_A_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, 0.f, "LFO A rate", " Hz", 2.f, 1.f);
+        configParam(WAVE_A_PARAM, 0.f, 1.f, 0.5f, "LFO A wave (triangle..square)");
         configOutput(LFO_A_OUTPUT, "LFO A");
 
-        configParam(RATE_B_PARAM, 0.f, 1.f, 0.5f, "LFO B rate");
-        configParam(WAVE_B_PARAM, 0.f, 1.f, 0.5f, "LFO B wave (square..triangle)");
+        configParam(RATE_B_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, 0.f, "LFO B rate", " Hz", 2.f, 1.f);
+        configParam(WAVE_B_PARAM, 0.f, 1.f, 0.5f, "LFO B wave (triangle..square)");
         configOutput(LFO_B_OUTPUT, "LFO B");
     }
 
-    static constexpr float RATE_A_MIN_HZ = 0.02f;
-    static constexpr float RATE_A_LOG2_RATIO = 6.643856f; // log2(2/0.02)
-    static constexpr float RATE_B_MIN_HZ = 0.5f;
-    static constexpr float RATE_B_LOG2_RATIO = 5.321928f; // log2(20/0.5)
-
-    // Same +30/pow(2,30) trick as DroneVoice's pitch-to-freq: keeps the
-    // exponent argument non-negative for approxExp2_taylor5, cancelled out
-    // afterwards. std::pow(2.f, 30.f) has literal args so it's folded at
-    // compile time — no runtime powf call, unlike a direct std::pow(ratio, knob).
-    static float mapRate(float knobValue, float minHz, float log2Ratio) {
-        return minHz * dsp::approxExp2_taylor5(log2Ratio * knobValue + 30.f) / std::pow(2.f, 30.f);
-    }
-
     void process(const ProcessArgs& args) override {
-        float freqA = mapRate(params[RATE_A_PARAM].getValue(), RATE_A_MIN_HZ, RATE_A_LOG2_RATIO);
+        float freqA = octavesToHz(params[RATE_A_PARAM].getValue());
         float valueA = lfoA.process(args.sampleTime, freqA, params[WAVE_A_PARAM].getValue());
         outputs[LFO_A_OUTPUT].setVoltage(valueA * 10.f);
 
-        float freqB = mapRate(params[RATE_B_PARAM].getValue(), RATE_B_MIN_HZ, RATE_B_LOG2_RATIO);
+        float freqB = octavesToHz(params[RATE_B_PARAM].getValue());
         float valueB = lfoB.process(args.sampleTime, freqB, params[WAVE_B_PARAM].getValue());
         outputs[LFO_B_OUTPUT].setVoltage(valueB * 10.f);
     }

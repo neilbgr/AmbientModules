@@ -9,8 +9,8 @@ using namespace rack;
 struct TriSquareLFO {
     float phase = 0.f;
 
-    // freqHz: LFO frequency in Hz (already mapped from the rate knob by the caller).
-    // waveAmount: 0 = pure square, 1 = pure triangle, 0.5 = equal blend.
+    // freqHz: LFO frequency in Hz.
+    // waveAmount: 0 = pure triangle, 1 = pure square, 0.5 = equal blend.
     // Returns the LFO value in [0, 1].
     float process(float sampleTime, float freqHz, float waveAmount) {
         phase += freqHz * sampleTime;
@@ -19,6 +19,6 @@ struct TriSquareLFO {
         float square = (phase < 0.5f) ? 1.f : 0.f;
         float triangle = 1.f - std::fabs(2.f * phase - 1.f);
 
-        return waveAmount * triangle + (1.f - waveAmount) * square;
+        return waveAmount * square + (1.f - waveAmount) * triangle;
     }
 };
