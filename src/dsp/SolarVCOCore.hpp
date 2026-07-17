@@ -54,13 +54,27 @@ struct SolarVCOCore {
             case WAVE_SQUARE:
                 out = (phase < shape) ? 1.f : -1.f; // shape = pulse width here
                 break;
-            case WAVE_SAW_MORPH:
-                out = saw + shape * (-saw - saw); // lerp(saw, -saw, shape)
+            case WAVE_SAW_MORPH: {
+                // shape 0 = rising saw, 0.5 = symmetric triangle, 1 = falling
+                // ramp (inverted saw): move the single peak's position across
+                // the cycle instead of crossfading saw with -saw (which
+                // cancels to a flat zero line at shape=0.5) — peak-to-peak
+                // stays exactly 2 for every shape value.
+                float bp = clamp(1.f - shape, 0.001f, 0.999f);
+                out = (phase < bp) ? (-1.f + 2.f * phase / bp)
+                                    : (1.f - 2.f * (phase - bp) / (1.f - bp));
                 break;
+            }
             case WAVE_SINE_TRI_MORPH: {
+                // Reshape the sine into a triangle via an arcsine waveshaper
+                // instead of crossfading two independent waveforms: at the
+                // phase where sine hits +-1, asin(k*sine)/asin(k) also hits
+                // exactly +-1 for any k, so peak-to-peak stays at 2 through
+                // the whole morph. k=1 reduces exactly to the classic
+                // triangle-from-sine identity (2/pi)*asin(sin(x)).
                 float sine = std::sin(2.f * M_PI * phase);
-                float tri = (phase < 0.5f) ? (4.f * phase - 1.f) : (3.f - 4.f * phase);
-                out = sine + shape * (tri - sine);
+                float k = clamp(shape, 0.f, 0.999f);
+                out = (k < 1e-3f) ? sine : (std::asin(k * sine) / std::asin(k));
                 break;
             }
             default:
