@@ -106,10 +106,11 @@ struct Solar50Drone : Module {
         gateTrigger.process(inputs[GATE_INPUT].getVoltage());
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
         bool gateHigh = gateTrigger.isHigh() || holdActive;
-        lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
-
+        
         envelope.updateCoefficients(params[ATTACK_PARAM].getValue(), params[RELEASE_PARAM].getValue());
         float envValue = envelope.process(args.sampleTime, gateHigh);
+
+        lights[HOLD_LIGHT].setBrightness(envValue);
 
         outputs[ENV_OUTPUT].setVoltage(envValue * 10.f);
         outputs[SAW_OUTPUT].setVoltage(5.f * mix / NUM_OSC * envValue);
