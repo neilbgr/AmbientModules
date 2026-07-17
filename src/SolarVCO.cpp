@@ -57,10 +57,10 @@ struct SolarVCO : Module {
         configOutput(DRY_OUTPUT, "Dry");
         configOutput(VCO_OUTPUT, "VCO (enveloped)");
 
-        configParam(ATTACK_PARAM, 0.f, 1.f, 0.2f, "Attack");
-        configParam(DECAY_PARAM, 0.f, 1.f, 0.2f, "Decay");
-        configParam(SUSTAIN_PARAM, 0.f, 1.f, 0.7f, "Sustain");
-        configParam(RELEASE_PARAM, 0.f, 1.f, 0.2f, "Release");
+        configParam(ATTACK_PARAM, 0.f, 1.f, 0.2f, "Attack", " ms", ADSREnvelope::MAX_TIME / ADSREnvelope::MIN_TIME, ADSREnvelope::MIN_TIME * 1000.f);
+        configParam(DECAY_PARAM, 0.f, 1.f, 0.2f, "Decay", " ms", ADSREnvelope::MAX_TIME / ADSREnvelope::MIN_TIME, ADSREnvelope::MIN_TIME * 1000.f);
+        configParam(SUSTAIN_PARAM, 0.f, 1.f, 0.7f, "Sustain", "%", 0.f, 100.f);
+        configParam(RELEASE_PARAM, 0.f, 1.f, 0.2f, "Release", " ms", ADSREnvelope::MAX_TIME / ADSREnvelope::MIN_TIME, ADSREnvelope::MIN_TIME * 1000.f);
         configSwitch(HOLD_PARAM, 0.f, 1.f, 0.f, "Hold", {"Off", "On"});
         configSwitch(SELFGEN_PARAM, 0.f, 1.f, 0.f, "Self-generation", {"Off", "On"});
         configInput(GATE_INPUT, "Gate");
@@ -104,16 +104,15 @@ struct SolarVCOWidget : ModuleWidget {
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-
-        // Placeholder layout, panel design still WIP in Inkscape.
-        addParam(createParamCentered<Rogan2PSBlue>(mm2px(Vec(15.f, 18.f)), module, SolarVCO::WAVEFORM_PARAM));
-        addParam(createParamCentered<RoundBigBlackKnob>(mm2px(Vec(15.f, 34.f)), module, SolarVCO::TUNE_PARAM));
+        
+        addParam(createParamCentered<Rogan3PSGreen>(mm2px(Vec(15.f, 18.f)), module, SolarVCO::WAVEFORM_PARAM));
+        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(15.f, 34.f)), module, SolarVCO::TUNE_PARAM));
         addParam(createParamCentered<CKSS>(mm2px(Vec(8.f, 44.f)), module, SolarVCO::OCTAVE_PARAM));
         addParam(createParamCentered<CKSS>(mm2px(Vec(15.f, 44.f)), module, SolarVCO::SUB_PARAM));
         addParam(createParamCentered<CKSS>(mm2px(Vec(22.f, 44.f)), module, SolarVCO::LINEXP_PARAM));
 
         addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(8.f, 56.f)), module, SolarVCO::SHAPE_PARAM));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(15.f, 56.f)), module, SolarVCO::SHAPE_CV_ATTEN_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(15.f, 56.f)), module, SolarVCO::SHAPE_CV_ATTEN_PARAM));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.f, 56.f)), module, SolarVCO::SHAPE_CV_INPUT));
 
         addParam(createParamCentered<Trimpot>(mm2px(Vec(8.f, 66.f)), module, SolarVCO::FM_CV_ATTEN_PARAM));
@@ -124,10 +123,10 @@ struct SolarVCOWidget : ModuleWidget {
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 76.f)), module, SolarVCO::DRY_OUTPUT));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(22.f, 76.f)), module, SolarVCO::VCO_OUTPUT));
 
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(6.f, 90.f)), module, SolarVCO::ATTACK_PARAM));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(14.f, 90.f)), module, SolarVCO::DECAY_PARAM));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(22.f, 90.f)), module, SolarVCO::SUSTAIN_PARAM));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(30.f, 90.f)), module, SolarVCO::RELEASE_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(6.f, 90.f)), module, SolarVCO::ATTACK_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(14.f, 90.f)), module, SolarVCO::DECAY_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(22.f, 90.f)), module, SolarVCO::SUSTAIN_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(30.f, 90.f)), module, SolarVCO::RELEASE_PARAM));
 
         addParam(createParamCentered<CKSS>(mm2px(Vec(8.f, 102.f)), module, SolarVCO::HOLD_PARAM));
         addParam(createParamCentered<CKSS>(mm2px(Vec(18.f, 102.f)), module, SolarVCO::SELFGEN_PARAM));
