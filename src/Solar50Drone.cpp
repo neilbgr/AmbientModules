@@ -53,8 +53,8 @@ struct Solar50Drone : Module {
         configOutput(SAW_OUTPUT, "Sawtooth mix");
 
         configSwitch(HOLD_PARAM, 0.f, 1.f, 0.f, "Hold (manual gate)", {"Off", "On"});
-        configParam(ATTACK_PARAM, 0.f, 1.f, 0.2f, "Envelope attack");
-        configParam(RELEASE_PARAM, 0.f, 1.f, 0.2f, "Envelope release");
+        configParam(ATTACK_PARAM, 0.f, 1.f, 0.2f, "Envelope attack", " ms", AREnvelope::MAX_TIME / AREnvelope::MIN_TIME, AREnvelope::MIN_TIME * 1000.f);
+        configParam(RELEASE_PARAM, 0.f, 1.f, 0.2f, "Envelope release", " ms", AREnvelope::MAX_TIME / AREnvelope::MIN_TIME, AREnvelope::MIN_TIME * 1000.f);
         configInput(GATE_INPUT, "Envelope gate");
         configOutput(ENV_OUTPUT, "Envelope");
 
@@ -136,20 +136,19 @@ struct Solar50DroneWidget : ModuleWidget {
             addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(oscX[3], oscY[i])), module, Solar50Drone::MOD_PARAM + i, Solar50Drone::MOD_LIGHT + i));
         }
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(36.f, 75.f)), module, Solar50Drone::CV_INPUT));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(48.f, 75.f)), module, Solar50Drone::ATTEN_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.8f, 108.f)), module, Solar50Drone::SAW_OUTPUT));
+        addParam(createParamCentered<Trimpot>(mm2px(Vec(48.f, 72.f)), module, Solar50Drone::ATTEN_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(48.f, 83.f)), module, Solar50Drone::CV_INPUT));
 
-        // Envelope section — placeholder coordinates, panel layout still WIP in Inkscape.
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(8.f, 90.f)), module, Solar50Drone::GATE_INPUT));
-        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(18.f, 90.f)), module, Solar50Drone::HOLD_PARAM, Solar50Drone::HOLD_LIGHT));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(8.f, 105.f)), module, Solar50Drone::ATTACK_PARAM));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(18.f, 105.f)), module, Solar50Drone::RELEASE_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(8.f, 118.f)), module, Solar50Drone::ENV_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 76.25f)), module, Solar50Drone::VOLT_CV_INPUT));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(28.75f, 76.25f)), module, Solar50Drone::VOLT_PARAM));
 
-        // VOLT knob — placeholder coordinates, panel layout still WIP in Inkscape.
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.f, 90.f)), module, Solar50Drone::VOLT_CV_INPUT));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(36.f, 90.f)), module, Solar50Drone::VOLT_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(12.f, 98.f)), module, Solar50Drone::ATTACK_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(24.f, 98.f)), module, Solar50Drone::RELEASE_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(36.f, 98.f)), module, Solar50Drone::ENV_OUTPUT));
+
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 113.f)), module, Solar50Drone::GATE_INPUT));
+        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(24.f, 113.f)), module, Solar50Drone::HOLD_PARAM, Solar50Drone::HOLD_LIGHT));        
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 113.f)), module, Solar50Drone::SAW_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
