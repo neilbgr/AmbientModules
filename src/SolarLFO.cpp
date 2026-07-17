@@ -43,13 +43,21 @@ struct SolarLFO : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float freqA = octavesToHz(params[RATE_A_PARAM].getValue());
-        float valueA = lfoA.process(args.sampleTime, freqA, params[WAVE_A_PARAM].getValue());
-        outputs[LFO_A_OUTPUT].setVoltage(valueA * 10.f);
+        if (outputs[LFO_A_OUTPUT].isConnected()) {
+            float freqA = octavesToHz(params[RATE_A_PARAM].getValue());
+            float valueA = lfoA.process(args.sampleTime, freqA, params[WAVE_A_PARAM].getValue());
+            outputs[LFO_A_OUTPUT].setVoltage(valueA * 10.f);
+        } else {
+            lfoA.phase = 0.f;
+        }
 
-        float freqB = octavesToHz(params[RATE_B_PARAM].getValue());
-        float valueB = lfoB.process(args.sampleTime, freqB, params[WAVE_B_PARAM].getValue());
-        outputs[LFO_B_OUTPUT].setVoltage(valueB * 10.f);
+        if (outputs[LFO_B_OUTPUT].isConnected()) {
+            float freqB = octavesToHz(params[RATE_B_PARAM].getValue());
+            float valueB = lfoB.process(args.sampleTime, freqB, params[WAVE_B_PARAM].getValue());
+            outputs[LFO_B_OUTPUT].setVoltage(valueB * 10.f);
+        } else {
+            lfoB.phase = 0.f;
+        }
     }
 };
 
