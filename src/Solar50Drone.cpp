@@ -4,6 +4,7 @@
 
 struct Solar50Drone : Module {
     static const int NUM_OSC = DroneVoice::NUM_OSC;
+    static constexpr float OUTPUT_VOLTAGE = 5.f; // Eurorack ±5V audio convention
 
     enum ParamIds {
         ENUMS(FREQ_PARAM, NUM_OSC),
@@ -21,6 +22,7 @@ struct Solar50Drone : Module {
         ENUMS(TRIG_INPUT, NUM_OSC),
         GATE_INPUT,
         VOLT_CV_INPUT,
+        ENV_INPUT,
         NUM_INPUTS
     };
     enum OutputIds {
@@ -57,6 +59,7 @@ struct Solar50Drone : Module {
         configParam(RELEASE_PARAM, 0.f, 1.f, 0.2f, "Envelope release", " ms", AREnvelope::MAX_TIME / AREnvelope::MIN_TIME, AREnvelope::MIN_TIME * 1000.f);
         configInput(GATE_INPUT, "Envelope gate");
         configOutput(ENV_OUTPUT, "Envelope");
+        configInput(ENV_INPUT, "Envelope CV (overrides internal envelope, gate and hold when connected — for chaining several drones on one envelope)");
 
         configParam(VOLT_PARAM, -1.f, 1.f, 0.f, "Volt (detune / FM)");
         configInput(VOLT_CV_INPUT, "Volt CV");
@@ -101,19 +104,30 @@ struct Solar50Drone : Module {
         // ±5V CV, added to the knob and clamped back into the knob's own -1..1 range.
         float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 5.f, -1.f, 1.f);
 
-        float mix = voice.process(args.sampleTime, args.sampleRate, pitchParams, active, mod, cv, volt);
-
         gateTrigger.process(inputs[GATE_INPUT].getVoltage());
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
         bool gateHigh = gateTrigger.isHigh() || holdActive;
-        
-        envelope.updateCoefficients(params[ATTACK_PARAM].getValue(), params[RELEASE_PARAM].getValue());
-        float envValue = envelope.process(args.sampleTime, gateHigh);
 
-        lights[HOLD_LIGHT].setBrightness(envValue);
+        float envValue;
+        if (inputs[ENV_INPUT].isConnected()) {
+            envValue = inputs[ENV_INPUT].getVoltage() / 10.f;
+        } else {
+            envelope.updateCoefficients(params[ATTACK_PARAM].getValue(), params[RELEASE_PARAM].getValue());
+            envValue = envelope.process(args.sampleTime, gateHigh);
+        }
+        float envAmount = clamp(envValue, 0.f, 1.f);
+
+        lights[HOLD_LIGHT].setBrightness(envAmount);
+
+        // Envelope silent -> output would be zero anyway, skip the 5-oscillator engine entirely.
+        float sawOut = 0.f;
+        if (envAmount > 0.f) {
+            float mix = voice.process(args.sampleTime, args.sampleRate, pitchParams, active, mod, cv, volt);
+            sawOut = OUTPUT_VOLTAGE * mix / NUM_OSC * envAmount; // average of NUM_OSC oscillators, scaled to OUTPUT_VOLTAGE
+        }
 
         outputs[ENV_OUTPUT].setVoltage(envValue * 10.f);
-        outputs[SAW_OUTPUT].setVoltage(5.f * mix / NUM_OSC * envValue);
+        outputs[SAW_OUTPUT].setVoltage(sawOut);
     }
 };
 
@@ -142,9 +156,10 @@ struct Solar50DroneWidget : ModuleWidget {
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 76.25f)), module, Solar50Drone::VOLT_CV_INPUT));
         addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(28.75f, 76.25f)), module, Solar50Drone::VOLT_PARAM));
 
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(12.f, 98.f)), module, Solar50Drone::ATTACK_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(24.f, 98.f)), module, Solar50Drone::RELEASE_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(36.f, 98.f)), module, Solar50Drone::ENV_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 98.f)), module, Solar50Drone::ENV_INPUT));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(24.f, 98.f)), module, Solar50Drone::ATTACK_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(36.f, 98.f)), module, Solar50Drone::RELEASE_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 98.f)), module, Solar50Drone::ENV_OUTPUT));
 
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 113.f)), module, Solar50Drone::GATE_INPUT));
         addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(24.f, 113.f)), module, Solar50Drone::HOLD_PARAM, Solar50Drone::HOLD_LIGHT));        

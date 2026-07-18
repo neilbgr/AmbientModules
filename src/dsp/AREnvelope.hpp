@@ -9,6 +9,10 @@ struct AREnvelope {
     static constexpr float MIN_TIME = 0.001f; // 1 ms
     static constexpr float MAX_TIME = 15.f;   // 15 s, slow drone-style swells
     static constexpr float LOG2_RATIO = 13.872675f; // log2(MAX_TIME / MIN_TIME)
+    // Overshoot the real target so the exponential curve actually crosses it
+    // in bounded time (proportional to the knob), instead of approaching it
+    // forever (same trick as ADSREnvelope/Fundamental's ADSR).
+    static constexpr float TARGET_OVERSHOOT = 0.01f;
 
     float out = 0.f;
     float attackLambda = 1.f / MIN_TIME;
@@ -32,10 +36,14 @@ struct AREnvelope {
 
     // Returns the current envelope value in [0, 1].
     float process(float sampleTime, bool gate) {
-        float target = gate ? 1.f : 0.f;
+        float target = gate ? (1.f + TARGET_OVERSHOOT) : -TARGET_OVERSHOOT;
         float lambda = (target > out) ? attackLambda : releaseLambda;
         float y = out + (target - out) * lambda * sampleTime;
         out = (out == y) ? target : y; // snap to avoid a floating-point stall
+        // Clamping the state itself (not just the returned value) pins it at
+        // an exact 0/1 once crossed, so a caller can test out==0.f cheaply to
+        // detect real silence instead of chasing an asymptotic tail.
+        out = clamp(out, 0.f, 1.f);
         return out;
     }
 };

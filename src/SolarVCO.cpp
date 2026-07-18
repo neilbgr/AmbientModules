@@ -105,17 +105,18 @@ struct SolarVCOWidget : ModuleWidget {
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         
-        addParam(createParamCentered<Rogan3PSGreen>(mm2px(Vec(15.f, 18.f)), module, SolarVCO::WAVEFORM_PARAM));
-        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(15.f, 34.f)), module, SolarVCO::TUNE_PARAM));
+        addParam(createParamCentered<Rogan3PSGreen>(mm2px(Vec(25.5f, 25.5f)), module, SolarVCO::WAVEFORM_PARAM));
+        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(50.f, 25.5f)), module, SolarVCO::TUNE_PARAM));
+
         addParam(createParamCentered<CKSS>(mm2px(Vec(8.f, 44.f)), module, SolarVCO::OCTAVE_PARAM));
         addParam(createParamCentered<CKSS>(mm2px(Vec(15.f, 44.f)), module, SolarVCO::SUB_PARAM));
         addParam(createParamCentered<CKSS>(mm2px(Vec(22.f, 44.f)), module, SolarVCO::LINEXP_PARAM));
 
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(8.f, 56.f)), module, SolarVCO::SHAPE_PARAM));
+        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(8.f, 56.f)), module, SolarVCO::SHAPE_PARAM));
         addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(15.f, 56.f)), module, SolarVCO::SHAPE_CV_ATTEN_PARAM));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.f, 56.f)), module, SolarVCO::SHAPE_CV_INPUT));
 
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(8.f, 66.f)), module, SolarVCO::FM_CV_ATTEN_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(8.f, 66.f)), module, SolarVCO::FM_CV_ATTEN_PARAM));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(15.f, 66.f)), module, SolarVCO::FM_INPUT));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.f, 66.f)), module, SolarVCO::SYNC_INPUT));
 
