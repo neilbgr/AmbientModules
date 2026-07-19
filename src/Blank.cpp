@@ -27,10 +27,8 @@ struct BlankWidget : ModuleWidget {
         setModule(module);
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Blank", module ? module->theme : 0))));
 
-        addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
-        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-        addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ThemedScrew>(Vec(box.size.x / 2 - RACK_GRID_WIDTH / 2, 0)));
+        addChild(createWidget<ThemedScrew>(Vec(box.size.x / 2 - RACK_GRID_WIDTH / 2, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
     }
 
     void appendContextMenu(Menu* menu) override {
