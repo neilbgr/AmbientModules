@@ -1,10 +1,13 @@
 #include "plugin.hpp"
 #include "dsp/AREnvelope.hpp"
 #include "dsp/DroneVoice.hpp"
+#include "PanelTheme.hpp"
 
 struct Solar50Drone : Module {
     static const int NUM_OSC = DroneVoice::NUM_OSC;
     static constexpr float OUTPUT_VOLTAGE = 5.f; // Eurorack ±5V audio convention
+
+    int theme = 0;
 
     enum ParamIds {
         ENUMS(FREQ_PARAM, NUM_OSC),
@@ -68,6 +71,7 @@ struct Solar50Drone : Module {
     json_t* dataToJson() override {
         json_t* rootJ = json_object();
         json_object_set_new(rootJ, "fmTopology", json_integer(voice.fmTopology));
+        json_object_set_new(rootJ, "theme", json_integer(theme));
         return rootJ;
     }
 
@@ -75,6 +79,10 @@ struct Solar50Drone : Module {
         json_t* fmTopologyJ = json_object_get(rootJ, "fmTopology");
         if (fmTopologyJ) {
             voice.fmTopology = json_integer_value(fmTopologyJ);
+        }
+        json_t* themeJ = json_object_get(rootJ, "theme");
+        if (themeJ) {
+            theme = json_integer_value(themeJ);
         }
     }
 
@@ -134,7 +142,7 @@ struct Solar50Drone : Module {
 struct Solar50DroneWidget : ModuleWidget {
     Solar50DroneWidget(Solar50Drone* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/Solar50Drone.svg")));
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Solar50Drone", module ? module->theme : 0))));
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -171,6 +179,13 @@ struct Solar50DroneWidget : ModuleWidget {
         assert(module);
 
         menu->addChild(new MenuSeparator);
+        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
+            [=]() { return module->theme; },
+            [=](int theme) {
+                module->theme = theme;
+                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Solar50Drone", theme))));
+            }
+        ));
         menu->addChild(createIndexPtrSubmenuItem("FM topology", {"Average of active others", "Circular chain"}, &module->voice.fmTopology));
     }
 };

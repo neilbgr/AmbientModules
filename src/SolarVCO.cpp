@@ -1,8 +1,11 @@
 #include "plugin.hpp"
 #include "dsp/SolarVCOCore.hpp"
 #include "dsp/ADSREnvelope.hpp"
+#include "PanelTheme.hpp"
 
 struct SolarVCO : Module {
+    int theme = 0;
+
     enum ParamIds {
         WAVEFORM_PARAM,
         TUNE_PARAM,
@@ -67,6 +70,19 @@ struct SolarVCO : Module {
         configOutput(ENV_OUTPUT, "Envelope");
     }
 
+    json_t* dataToJson() override {
+        json_t* rootJ = json_object();
+        json_object_set_new(rootJ, "theme", json_integer(theme));
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override {
+        json_t* themeJ = json_object_get(rootJ, "theme");
+        if (themeJ) {
+            theme = json_integer_value(themeJ);
+        }
+    }
+
     void process(const ProcessArgs& args) override {
         float octaveOffset = params[OCTAVE_PARAM].getValue() > 0.f ? 3.f : 0.f;
         float pitch = params[TUNE_PARAM].getValue() + octaveOffset + inputs[VOCT_INPUT].getVoltage();
@@ -98,7 +114,7 @@ struct SolarVCO : Module {
 struct SolarVCOWidget : ModuleWidget {
     SolarVCOWidget(SolarVCO* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SolarVCO.svg")));
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarVCO", module ? module->theme : 0))));
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -133,6 +149,20 @@ struct SolarVCOWidget : ModuleWidget {
         addParam(createParamCentered<CKSS>(mm2px(Vec(18.f, 102.f)), module, SolarVCO::SELFGEN_PARAM));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.f, 102.f)), module, SolarVCO::GATE_INPUT));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 114.f)), module, SolarVCO::ENV_OUTPUT));
+    }
+
+    void appendContextMenu(Menu* menu) override {
+        SolarVCO* module = dynamic_cast<SolarVCO*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator);
+        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
+            [=]() { return module->theme; },
+            [=](int theme) {
+                module->theme = theme;
+                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarVCO", theme))));
+            }
+        ));
     }
 };
 

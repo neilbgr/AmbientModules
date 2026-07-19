@@ -1,7 +1,10 @@
 #include "plugin.hpp"
 #include "dsp/TriSquareLFO.hpp"
+#include "PanelTheme.hpp"
 
 struct SolarLFO : Module {
+    int theme = 0;
+
     enum ParamIds {
         WAVE_A_PARAM,
         RATE_A_PARAM,
@@ -42,6 +45,19 @@ struct SolarLFO : Module {
         configOutput(LFO_B_OUTPUT, "LFO B");
     }
 
+    json_t* dataToJson() override {
+        json_t* rootJ = json_object();
+        json_object_set_new(rootJ, "theme", json_integer(theme));
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override {
+        json_t* themeJ = json_object_get(rootJ, "theme");
+        if (themeJ) {
+            theme = json_integer_value(themeJ);
+        }
+    }
+
     void process(const ProcessArgs& args) override {
         if (outputs[LFO_A_OUTPUT].isConnected()) {
             float freqA = octavesToHz(params[RATE_A_PARAM].getValue());
@@ -64,7 +80,7 @@ struct SolarLFO : Module {
 struct SolarLFOWidget : ModuleWidget {
     SolarLFOWidget(SolarLFO* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SolarLFO.svg")));
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarLFO", module ? module->theme : 0))));
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         //addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -80,6 +96,20 @@ struct SolarLFOWidget : ModuleWidget {
         addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 78.5f)), module, SolarLFO::RATE_B_PARAM));
         addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 97.5f)), module, SolarLFO::WAVE_B_PARAM));        
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 113.f)), module, SolarLFO::LFO_B_OUTPUT));
+    }
+
+    void appendContextMenu(Menu* menu) override {
+        SolarLFO* module = dynamic_cast<SolarLFO*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator);
+        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
+            [=]() { return module->theme; },
+            [=](int theme) {
+                module->theme = theme;
+                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarLFO", theme))));
+            }
+        ));
     }
 };
 
