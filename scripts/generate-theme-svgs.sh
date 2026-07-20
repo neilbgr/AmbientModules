@@ -25,7 +25,7 @@ declare -A THEME_FG=(
   [Black]="#fff"
   [Pink]="#000"
   [Yellow]="#000"
-  [Blue]="#fff"
+  [Blue]="#bfcbe3"
 )
 THEME_ORDER=(WhiteCream Black Pink Yellow Blue)
 
