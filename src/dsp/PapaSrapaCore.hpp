@@ -1,0 +1,69 @@
+#pragma once
+#include <rack.hpp>
+
+using namespace rack;
+
+// One "Papa Srapa" noise voice (Solar 42F drone voices 3/6): a low-frequency
+// square modulator cross-modulating (FM and/or AM) a square audio oscillator
+// (roughly C0..E7), plus an independent white-noise generator always mixed
+// into the output. Not a literal circuit emulation of the real coupled
+// Trigger-Schmidt oscillators (undocumented, chaotic) — an idiomatic
+// approximation in the spirit of DroneVoice/SolarVCOCore/TriSquareLFO, tuned
+// by ear against the real hardware. Pure DSP, no Module/param/light dependency.
+struct PapaSrapaCore {
+    enum ModMode { MODE_OFF, MODE_FM, MODE_AM, MODE_FM_AM };
+
+    float modPhase = 0.f;
+    float audioPhase = 0.f;
+    uint32_t noiseState = 0x1234567u; // xorshift32 state, must stay non-zero
+    float noise = 0.f; // last white-noise sample in [-1, 1], tapped by the S&H
+
+    static float nextNoise(uint32_t& state) {
+        // xorshift32: cheap, good enough for audio-rate white noise, no runtime pow/trig.
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        return (float)(int32_t)state / 2147483648.f;
+    }
+
+    // rateOctaves: LF modulator frequency (octaves, same convention as
+    // SolarLFO::octavesToHz). dividerAmount: 0..1, divides the modulator's
+    // frequency down (1..8) before it reaches the FM/AM stage — richer,
+    // slower beating at higher settings.
+    // pitchOctaves: audio oscillator base frequency (octaves rel. C4, same
+    // idiom as SolarVCOCore/DroneVoice).
+    // modDepth: 0..1, FM/AM modulation depth. modMode: which of FM/AM (or
+    // both/neither) is active. noiseAmount: 0..1, independent white-noise mix.
+    // Returns the mixed output in roughly [-1, 1].
+    float process(float sampleTime, float sampleRate,
+                   float rateOctaves, float dividerAmount,
+                   float pitchOctaves, float modDepth, ModMode modMode,
+                   float noiseAmount) {
+        float modFreq = dsp::approxExp2_taylor5(rateOctaves + 30.f) / std::pow(2.f, 30.f);
+        float divider = 1.f + dividerAmount * 7.f; // 1..8
+        modFreq /= divider;
+
+        modPhase += modFreq * sampleTime;
+        modPhase -= std::floor(modPhase);
+        float modSquare = (modPhase < 0.5f) ? 1.f : -1.f;
+
+        bool fmOn = (modMode == MODE_FM || modMode == MODE_FM_AM);
+        bool amOn = (modMode == MODE_AM || modMode == MODE_FM_AM);
+
+        float fmOctaves = fmOn ? modSquare * modDepth * 2.f : 0.f; // up to +-2 octaves
+        float audioFreq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitchOctaves + fmOctaves + 30.f) / std::pow(2.f, 30.f);
+        audioFreq = clamp(audioFreq, 0.f, sampleRate / 2.f);
+
+        audioPhase += audioFreq * sampleTime;
+        audioPhase -= std::floor(audioPhase);
+        float audioSquare = (audioPhase < 0.5f) ? 1.f : -1.f;
+
+        float amGain = amOn ? (0.5f + 0.5f * modDepth * modSquare) : 1.f;
+        float out = audioSquare * amGain;
+
+        noise = nextNoise(noiseState);
+        out += noise * noiseAmount;
+
+        return out;
+    }
+};

@@ -9,3 +9,4 @@ extern Model *modelBlank;
 extern Model *modelSolar50Drone;
 extern Model *modelSolarLFO;
 extern Model *modelSolarVCO;
+extern Model *modelSolarPapaSrapa;

@@ -8,4 +8,5 @@ void init(Plugin *p) {
     p->addModel(modelSolar50Drone);
     p->addModel(modelSolarLFO);
     p->addModel(modelSolarVCO);
+    p->addModel(modelSolarPapaSrapa);
 }

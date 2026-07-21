@@ -29,6 +29,7 @@ struct SolarVCO : Module {
         SHAPE_CV_INPUT,
         SYNC_INPUT,
         GATE_INPUT,
+        VCA_CV_INPUT,
         NUM_INPUTS
     };
     enum OutputIds {
@@ -37,12 +38,19 @@ struct SolarVCO : Module {
         ENV_OUTPUT,
         NUM_OUTPUTS
     };
+    enum LightIds {
+        OCTAVE_LIGHT,
+        SUB_LIGHT,
+        LINEXP_LIGHT,
+        HOLD_LIGHT,
+        NUM_LIGHTS
+    };
 
     SolarVCOCore vco;
     ADSREnvelope env;
 
     SolarVCO() {
-        config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
+        config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
         configSwitch(WAVEFORM_PARAM, 0.f, 5.f, 0.f, "Waveform",
             {"Sine", "Triangle", "Inverted saw", "Square", "Saw to inv. saw (shape = blend)", "Sine to triangle (shape = blend)"});
@@ -68,6 +76,7 @@ struct SolarVCO : Module {
         configSwitch(SELFGEN_PARAM, 0.f, 1.f, 0.f, "Self-generation", {"Off", "On"});
         configInput(GATE_INPUT, "Gate");
         configOutput(ENV_OUTPUT, "Envelope");
+        configInput(VCA_CV_INPUT, "VCA CV (overrides internal envelope, gate and hold when connected)");
     }
 
     json_t* dataToJson() override {
@@ -99,11 +108,21 @@ struct SolarVCO : Module {
             (int)params[WAVEFORM_PARAM].getValue(), shape,
             params[SUB_PARAM].getValue() > 0.f, inputs[SYNC_INPUT].getVoltage());
 
-        bool gate = inputs[GATE_INPUT].getVoltage() >= 1.f;
-        float envValue = env.process(args.sampleTime, gate,
-            params[SELFGEN_PARAM].getValue() > 0.f, params[HOLD_PARAM].getValue() > 0.f,
-            params[ATTACK_PARAM].getValue(), params[DECAY_PARAM].getValue(),
-            params[SUSTAIN_PARAM].getValue(), params[RELEASE_PARAM].getValue());
+        float envValue;
+        if (inputs[VCA_CV_INPUT].isConnected()) {
+            envValue = clamp(inputs[VCA_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+        } else {
+            bool gate = inputs[GATE_INPUT].getVoltage() >= 1.f;
+            envValue = env.process(args.sampleTime, gate,
+                params[SELFGEN_PARAM].getValue() > 0.f, params[HOLD_PARAM].getValue() > 0.f,
+                params[ATTACK_PARAM].getValue(), params[DECAY_PARAM].getValue(),
+                params[SUSTAIN_PARAM].getValue(), params[RELEASE_PARAM].getValue());
+        }
+
+        lights[OCTAVE_LIGHT].setBrightness(params[OCTAVE_PARAM].getValue() > 0.f ? 1.f : 0.f);
+        lights[SUB_LIGHT].setBrightness(params[SUB_PARAM].getValue() > 0.f ? 1.f : 0.f);
+        lights[LINEXP_LIGHT].setBrightness(params[LINEXP_PARAM].getValue() > 0.f ? 1.f : 0.f);
+        lights[HOLD_LIGHT].setBrightness(params[HOLD_PARAM].getValue() > 0.f ? 1.f : 0.f);
 
         outputs[DRY_OUTPUT].setVoltage(dry * 5.f);
         outputs[VCO_OUTPUT].setVoltage(dry * 5.f * envValue);
@@ -124,9 +143,9 @@ struct SolarVCOWidget : ModuleWidget {
         addParam(createParamCentered<Rogan3PSGreen>(mm2px(Vec(25.5f, 25.5f)), module, SolarVCO::WAVEFORM_PARAM));
         addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(50.f, 25.5f)), module, SolarVCO::TUNE_PARAM));
 
-        addParam(createParamCentered<CKSS>(mm2px(Vec(8.f, 44.f)), module, SolarVCO::OCTAVE_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(15.f, 44.f)), module, SolarVCO::SUB_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(22.f, 44.f)), module, SolarVCO::LINEXP_PARAM));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(8.f, 44.f)), module, SolarVCO::OCTAVE_PARAM, SolarVCO::OCTAVE_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(15.f, 44.f)), module, SolarVCO::SUB_PARAM, SolarVCO::SUB_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(22.f, 44.f)), module, SolarVCO::LINEXP_PARAM, SolarVCO::LINEXP_LIGHT));
 
         addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(8.f, 56.f)), module, SolarVCO::SHAPE_PARAM));
         addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(15.f, 56.f)), module, SolarVCO::SHAPE_CV_ATTEN_PARAM));
@@ -145,10 +164,11 @@ struct SolarVCOWidget : ModuleWidget {
         addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(22.f, 90.f)), module, SolarVCO::SUSTAIN_PARAM));
         addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(30.f, 90.f)), module, SolarVCO::RELEASE_PARAM));
 
-        addParam(createParamCentered<CKSS>(mm2px(Vec(8.f, 102.f)), module, SolarVCO::HOLD_PARAM));
+        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(8.f, 102.f)), module, SolarVCO::HOLD_PARAM, SolarVCO::HOLD_LIGHT));
         addParam(createParamCentered<CKSS>(mm2px(Vec(18.f, 102.f)), module, SolarVCO::SELFGEN_PARAM));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.f, 102.f)), module, SolarVCO::GATE_INPUT));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 114.f)), module, SolarVCO::ENV_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.f, 114.f)), module, SolarVCO::VCA_CV_INPUT));
     }
 
     void appendContextMenu(Menu* menu) override {

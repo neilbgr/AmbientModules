@@ -36,6 +36,12 @@
       "name": "SolarVCO",
       "description": "AS3340-style VCO with 6 waveforms (4 fixed + 2 morphing via shape), octave/sub/lin-exp switches, hard sync, and a full ADSR envelope with Hold and Self-generation",
       "tags": ["VCO", "Oscillator", "Envelope generator"]
+    },
+    {
+      "slug": "SolarPapaSrapa",
+      "name": "SolarPapaSrapa",
+      "description": "Noise voice inspired by the Solar 42F's \"Papa Srapa\" drone voices: FM/AM cross-modulated square oscillators, independent white noise, sample & hold, and an Attack/Release envelope with Hold",
+      "tags": ["Noise", "Oscillator", "LFO", "Envelope generator"]
     }
   ]
 }
