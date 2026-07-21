@@ -6,7 +6,7 @@ using namespace rack;
 // One "AS3340-style" VCO voice: 6 discrete waveforms (4 fixed + 2 morphing),
 // tune/octave/sub, lin or exp secondary FM input, hard sync. Pure DSP, no
 // Module/param/light dependency.
-struct SolarVCOCore {
+struct LunarVCOCore {
     enum Waveform {
         WAVE_SINE, WAVE_TRIANGLE, WAVE_INV_SAW, WAVE_SQUARE,
         WAVE_SAW_MORPH,       // shape = blend saw..inverted saw

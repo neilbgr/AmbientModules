@@ -8,7 +8,7 @@ using namespace rack;
 // (roughly C0..E7), plus an independent white-noise generator always mixed
 // into the output. Not a literal circuit emulation of the real coupled
 // Trigger-Schmidt oscillators (undocumented, chaotic) — an idiomatic
-// approximation in the spirit of DroneVoice/SolarVCOCore/TriSquareLFO, tuned
+// approximation in the spirit of DroneVoice/LunarVCOCore/TriSquareLFO, tuned
 // by ear against the real hardware. Pure DSP, no Module/param/light dependency.
 struct PapaSrapaCore {
     enum ModMode { MODE_OFF, MODE_FM, MODE_AM, MODE_FM_AM };
@@ -27,11 +27,11 @@ struct PapaSrapaCore {
     }
 
     // rateOctaves: LF modulator frequency (octaves, same convention as
-    // SolarLFO::octavesToHz). dividerAmount: 0..1, divides the modulator's
+    // LunarLFO::octavesToHz). dividerAmount: 0..1, divides the modulator's
     // frequency down (1..8) before it reaches the FM/AM stage — richer,
     // slower beating at higher settings.
     // pitchOctaves: audio oscillator base frequency (octaves rel. C4, same
-    // idiom as SolarVCOCore/DroneVoice).
+    // idiom as LunarVCOCore/DroneVoice).
     // modDepth: 0..1, FM/AM modulation depth. modMode: which of FM/AM (or
     // both/neither) is active. noiseAmount: 0..1, independent white-noise mix.
     // Returns the mixed output in roughly [-1, 1].

@@ -4,7 +4,7 @@ Checklist et conventions établies au fil du projet, pour ne rien oublier lors d
 
 ## 1. Classe(s) DSP réutilisable(s)
 
-Dans `src/dsp/<Nom>Core.hpp` (ou `<Nom>.hpp`) : header-only, `#pragma once`, **aucune dépendance à `Module`/param/light** — juste du calcul pur (`process(sampleTime, ...)` qui retourne une valeur). Exemples existants : `DroneVoice`, `AREnvelope`, `ADSREnvelope`, `TriSquareLFO`, `SolarVCOCore`. Ça permet de réutiliser le moteur dans un autre module plus tard sans dépendre du premier.
+Dans `src/dsp/<Nom>Core.hpp` (ou `<Nom>.hpp`) : header-only, `#pragma once`, **aucune dépendance à `Module`/param/light** — juste du calcul pur (`process(sampleTime, ...)` qui retourne une valeur). Exemples existants : `DroneVoice`, `AREnvelope`, `ADSREnvelope`, `TriSquareLFO`, `LunarVCOCore`. Ça permet de réutiliser le moteur dans un autre module plus tard sans dépendre du premier.
 
 ## 2. Le module lui-même : `src/<Nom>.cpp`
 
@@ -40,9 +40,9 @@ static void initStatic__AmbientModules()
     if (spl.ok())
     {
         p->addModel(modelBlank);
-        p->addModel(modelSolar50Drone);
-        p->addModel(modelSolarLFO);
-        p->addModel(modelSolarVCO);
+        p->addModel(modelLunar50Drone);
+        p->addModel(modelLunarLFO);
+        p->addModel(modelLunarVCO);
         p->addModel(model<Nom>);   // <- à ajouter ici
     }
 }
@@ -64,12 +64,12 @@ static void initStatic__AmbientModules()
   ```
   (le `std::pow(2.f, 30.f)` a deux arguments littéraux donc il est calculé à la compilation, coût nul à l'exécution).
 - Pas besoin de `dsp::ClockDivider` pour throttler ce calcul : `approxExp2_taylor5` est déjà assez léger pour tourner à chaque sample.
-- Si un `sin()` ou un calcul de forme d'onde coûteux dépend uniquement d'un output : le sauter si `outputs[X].isConnected()` est faux (gain réel, déjà vérifié en pratique sur SolarLFO/SolarVCO). Attention : ne pas sauter l'incrémentation de la phase elle-même si on veut éviter un saut audible à la reconnexion.
+- Si un `sin()` ou un calcul de forme d'onde coûteux dépend uniquement d'un output : le sauter si `outputs[X].isConnected()` est faux (gain réel, déjà vérifié en pratique sur LunarLFO/LunarVCO). Attention : ne pas sauter l'incrémentation de la phase elle-même si on veut éviter un saut audible à la reconnexion.
 - Pour vérifier après-coup qu'un `pow()` runtime a bien disparu : `x86_64-w64-mingw32-objdump -dr build/src/<Nom>.cpp.o | grep -i pow` (chercher une relocation `powf` — si rien ne sort, c'est bon).
 
 ## 7. Convention d'affichage des knobs
 
-- Fréquence en Hz mais progression perceptuelle (LFO, VCO) : le param doit être **linéaire en octaves**, pas en Hz — sinon la rotation du knob est écrasée vers les hautes fréquences. Utiliser `configParam(id, minOctaves, maxOctaves, défautOctaves, "Nom", " Hz", 2.f, 1.f)` (le `2.f` = affichage exponentiel en base 2) et convertir en Hz via `approxExp2_taylor5` avant de l'utiliser (voir `SolarLFO.cpp::octavesToHz`).
+- Fréquence en Hz mais progression perceptuelle (LFO, VCO) : le param doit être **linéaire en octaves**, pas en Hz — sinon la rotation du knob est écrasée vers les hautes fréquences. Utiliser `configParam(id, minOctaves, maxOctaves, défautOctaves, "Nom", " Hz", 2.f, 1.f)` (le `2.f` = affichage exponentiel en base 2) et convertir en Hz via `approxExp2_taylor5` avant de l'utiliser (voir `LunarLFO.cpp::octavesToHz`).
 - Temps d'enveloppe (attack/release/decay) : même principe mais en ms, en suivant la convention de `Fundamental`'s ADSR (`configParam(id, 0.f, 1.f, défaut, "Nom", " ms", MAX_TIME/MIN_TIME, MIN_TIME*1000.f)`).
 
 ## 8. Compiler et tester

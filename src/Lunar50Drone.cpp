@@ -3,7 +3,7 @@
 #include "dsp/DroneVoice.hpp"
 #include "PanelTheme.hpp"
 
-struct Solar50Drone : Module {
+struct Lunar50Drone : Module {
     static const int NUM_OSC = DroneVoice::NUM_OSC;
     static constexpr float OUTPUT_VOLTAGE = 5.f; // Eurorack ±5V audio convention
 
@@ -45,7 +45,7 @@ struct Solar50Drone : Module {
     AREnvelope envelope;
     dsp::SchmittTrigger gateTrigger;
 
-    Solar50Drone() {
+    Lunar50Drone() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         for (int i = 0; i < NUM_OSC; i++) {
             configInput(TRIG_INPUT + i, string::f("Oscillator %d activation trigger", i + 1));
@@ -139,10 +139,10 @@ struct Solar50Drone : Module {
     }
 };
 
-struct Solar50DroneWidget : ModuleWidget {
-    Solar50DroneWidget(Solar50Drone* module) {
+struct Lunar50DroneWidget : ModuleWidget {
+    Lunar50DroneWidget(Lunar50Drone* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Solar50Drone", module ? module->theme : 0))));
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Lunar50Drone", module ? module->theme : 0))));
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -150,32 +150,32 @@ struct Solar50DroneWidget : ModuleWidget {
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         const float oscX[4] = {12.f, 24.f, 36.f, 48.f};
-        const float oscY[Solar50Drone::NUM_OSC] = {22.f, 32.f, 42.f, 52.f, 62.f};
-        for (int i = 0; i < Solar50Drone::NUM_OSC; i++) {
-            addInput(createInputCentered<PJ301MPort>(mm2px(Vec(oscX[0], oscY[i])), module, Solar50Drone::TRIG_INPUT + i));
-            addParam(createLightParamCentered<VCVLightBezelLatch<RedLight>>(mm2px(Vec(oscX[1], oscY[i])), module, Solar50Drone::ACTIVE_PARAM + i, Solar50Drone::ACTIVE_LIGHT + i));
-            addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(oscX[2], oscY[i])), module, Solar50Drone::FREQ_PARAM + i));
-            addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(oscX[3], oscY[i])), module, Solar50Drone::MOD_PARAM + i, Solar50Drone::MOD_LIGHT + i));
+        const float oscY[Lunar50Drone::NUM_OSC] = {22.f, 32.f, 42.f, 52.f, 62.f};
+        for (int i = 0; i < Lunar50Drone::NUM_OSC; i++) {
+            addInput(createInputCentered<PJ301MPort>(mm2px(Vec(oscX[0], oscY[i])), module, Lunar50Drone::TRIG_INPUT + i));
+            addParam(createLightParamCentered<VCVLightBezelLatch<RedLight>>(mm2px(Vec(oscX[1], oscY[i])), module, Lunar50Drone::ACTIVE_PARAM + i, Lunar50Drone::ACTIVE_LIGHT + i));
+            addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(oscX[2], oscY[i])), module, Lunar50Drone::FREQ_PARAM + i));
+            addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(oscX[3], oscY[i])), module, Lunar50Drone::MOD_PARAM + i, Lunar50Drone::MOD_LIGHT + i));
         }
 
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(48.f, 72.f)), module, Solar50Drone::ATTEN_PARAM));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(48.f, 83.f)), module, Solar50Drone::CV_INPUT));
+        addParam(createParamCentered<Trimpot>(mm2px(Vec(48.f, 72.f)), module, Lunar50Drone::ATTEN_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(48.f, 83.f)), module, Lunar50Drone::CV_INPUT));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 76.25f)), module, Solar50Drone::VOLT_CV_INPUT));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(28.75f, 76.25f)), module, Solar50Drone::VOLT_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 76.25f)), module, Lunar50Drone::VOLT_CV_INPUT));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(28.75f, 76.25f)), module, Lunar50Drone::VOLT_PARAM));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 98.f)), module, Solar50Drone::ENV_INPUT));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(24.f, 98.f)), module, Solar50Drone::ATTACK_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(36.f, 98.f)), module, Solar50Drone::RELEASE_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 98.f)), module, Solar50Drone::ENV_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 98.f)), module, Lunar50Drone::ENV_INPUT));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(24.f, 98.f)), module, Lunar50Drone::ATTACK_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(36.f, 98.f)), module, Lunar50Drone::RELEASE_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 98.f)), module, Lunar50Drone::ENV_OUTPUT));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 113.f)), module, Solar50Drone::GATE_INPUT));
-        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(24.f, 113.f)), module, Solar50Drone::HOLD_PARAM, Solar50Drone::HOLD_LIGHT));        
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 113.f)), module, Solar50Drone::SAW_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 113.f)), module, Lunar50Drone::GATE_INPUT));
+        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(24.f, 113.f)), module, Lunar50Drone::HOLD_PARAM, Lunar50Drone::HOLD_LIGHT));        
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 113.f)), module, Lunar50Drone::SAW_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
-        Solar50Drone* module = dynamic_cast<Solar50Drone*>(this->module);
+        Lunar50Drone* module = dynamic_cast<Lunar50Drone*>(this->module);
         assert(module);
 
         menu->addChild(new MenuSeparator);
@@ -183,11 +183,11 @@ struct Solar50DroneWidget : ModuleWidget {
             [=]() { return module->theme; },
             [=](int theme) {
                 module->theme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Solar50Drone", theme))));
+                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Lunar50Drone", theme))));
             }
         ));
         menu->addChild(createIndexPtrSubmenuItem("FM topology", {"Average of active others", "Circular chain"}, &module->voice.fmTopology));
     }
 };
 
-Model* modelSolar50Drone = createModel<Solar50Drone, Solar50DroneWidget>("Solar50Drone");
+Model* modelLunar50Drone = createModel<Lunar50Drone, Lunar50DroneWidget>("Lunar50Drone");

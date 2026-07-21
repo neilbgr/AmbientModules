@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Generate the Black/Pink/Yellow/Blue/WhiteCream panel SVG variants for one
+# Generate the Black/Pink/Yellow/Blue/Cream panel SVG variants for one
 # or more AmbientModules modules from a single finished reference theme, by
 # substituting only the background/foreground colors.
 #
 # Usage: generate-theme-svgs.sh [--dry-run] <ReferenceTheme> <Module> [Module...]
-#   e.g. generate-theme-svgs.sh WhiteCream Solar50Drone SolarLFO SolarVCO Blank
+#   e.g. generate-theme-svgs.sh Cream Lunar50Drone LunarLFO LunarVCO Blank
 #
 # Assumption (checked once, see plan history): with the color table below, no
 # theme's bg equals another theme's fg, so a direct sequential replace
@@ -14,20 +14,20 @@
 set -euo pipefail
 
 declare -A THEME_BG=(
-  [WhiteCream]="#e9dfd2"
+  [Cream]="#e9dfd2"
   [Black]="#0d0d0d"
   [Pink]="#ffc0cb"
   [Yellow]="#fbc50c"
   [Blue]="#122e57"
 )
 declare -A THEME_FG=(
-  [WhiteCream]="#000"
+  [Cream]="#000"
   [Black]="#fff"
   [Pink]="#000"
   [Yellow]="#000"
   [Blue]="#bfcbe3"
 )
-THEME_ORDER=(WhiteCream Black Pink Yellow Blue)
+THEME_ORDER=(Cream Black Pink Yellow Blue)
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 res_dir="$script_dir/../res"

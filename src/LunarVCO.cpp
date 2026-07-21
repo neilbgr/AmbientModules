@@ -1,9 +1,9 @@
 #include "plugin.hpp"
-#include "dsp/SolarVCOCore.hpp"
+#include "dsp/LunarVCOCore.hpp"
 #include "dsp/ADSREnvelope.hpp"
 #include "PanelTheme.hpp"
 
-struct SolarVCO : Module {
+struct LunarVCO : Module {
     int theme = 0;
 
     enum ParamIds {
@@ -46,10 +46,10 @@ struct SolarVCO : Module {
         NUM_LIGHTS
     };
 
-    SolarVCOCore vco;
+    LunarVCOCore vco;
     ADSREnvelope env;
 
-    SolarVCO() {
+    LunarVCO() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
         configSwitch(WAVEFORM_PARAM, 0.f, 5.f, 0.f, "Waveform",
@@ -130,49 +130,49 @@ struct SolarVCO : Module {
     }
 };
 
-struct SolarVCOWidget : ModuleWidget {
-    SolarVCOWidget(SolarVCO* module) {
+struct LunarVCOWidget : ModuleWidget {
+    LunarVCOWidget(LunarVCO* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarVCO", module ? module->theme : 0))));
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarVCO", module ? module->theme : 0))));
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         
-        addParam(createParamCentered<Rogan3PSGreen>(mm2px(Vec(25.5f, 25.5f)), module, SolarVCO::WAVEFORM_PARAM));
-        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(50.f, 25.5f)), module, SolarVCO::TUNE_PARAM));
+        addParam(createParamCentered<Rogan3PSGreen>(mm2px(Vec(25.5f, 25.5f)), module, LunarVCO::WAVEFORM_PARAM));
+        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(50.f, 25.5f)), module, LunarVCO::TUNE_PARAM));
 
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(8.f, 44.f)), module, SolarVCO::OCTAVE_PARAM, SolarVCO::OCTAVE_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(15.f, 44.f)), module, SolarVCO::SUB_PARAM, SolarVCO::SUB_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(22.f, 44.f)), module, SolarVCO::LINEXP_PARAM, SolarVCO::LINEXP_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(8.f, 44.f)), module, LunarVCO::OCTAVE_PARAM, LunarVCO::OCTAVE_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(15.f, 44.f)), module, LunarVCO::SUB_PARAM, LunarVCO::SUB_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(22.f, 44.f)), module, LunarVCO::LINEXP_PARAM, LunarVCO::LINEXP_LIGHT));
 
-        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(8.f, 56.f)), module, SolarVCO::SHAPE_PARAM));
-        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(15.f, 56.f)), module, SolarVCO::SHAPE_CV_ATTEN_PARAM));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.f, 56.f)), module, SolarVCO::SHAPE_CV_INPUT));
+        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(8.f, 56.f)), module, LunarVCO::SHAPE_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(15.f, 56.f)), module, LunarVCO::SHAPE_CV_ATTEN_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.f, 56.f)), module, LunarVCO::SHAPE_CV_INPUT));
 
-        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(8.f, 66.f)), module, SolarVCO::FM_CV_ATTEN_PARAM));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(15.f, 66.f)), module, SolarVCO::FM_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.f, 66.f)), module, SolarVCO::SYNC_INPUT));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(8.f, 66.f)), module, LunarVCO::FM_CV_ATTEN_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(15.f, 66.f)), module, LunarVCO::FM_INPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.f, 66.f)), module, LunarVCO::SYNC_INPUT));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(8.f, 76.f)), module, SolarVCO::VOCT_INPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 76.f)), module, SolarVCO::DRY_OUTPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(22.f, 76.f)), module, SolarVCO::VCO_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(8.f, 76.f)), module, LunarVCO::VOCT_INPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 76.f)), module, LunarVCO::DRY_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(22.f, 76.f)), module, LunarVCO::VCO_OUTPUT));
 
-        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(6.f, 90.f)), module, SolarVCO::ATTACK_PARAM));
-        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(14.f, 90.f)), module, SolarVCO::DECAY_PARAM));
-        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(22.f, 90.f)), module, SolarVCO::SUSTAIN_PARAM));
-        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(30.f, 90.f)), module, SolarVCO::RELEASE_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(6.f, 90.f)), module, LunarVCO::ATTACK_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(14.f, 90.f)), module, LunarVCO::DECAY_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(22.f, 90.f)), module, LunarVCO::SUSTAIN_PARAM));
+        addParam(createParamCentered<Rogan1PSGreen>(mm2px(Vec(30.f, 90.f)), module, LunarVCO::RELEASE_PARAM));
 
-        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(8.f, 102.f)), module, SolarVCO::HOLD_PARAM, SolarVCO::HOLD_LIGHT));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(18.f, 102.f)), module, SolarVCO::SELFGEN_PARAM));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.f, 102.f)), module, SolarVCO::GATE_INPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 114.f)), module, SolarVCO::ENV_OUTPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.f, 114.f)), module, SolarVCO::VCA_CV_INPUT));
+        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(8.f, 102.f)), module, LunarVCO::HOLD_PARAM, LunarVCO::HOLD_LIGHT));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(18.f, 102.f)), module, LunarVCO::SELFGEN_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.f, 102.f)), module, LunarVCO::GATE_INPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 114.f)), module, LunarVCO::ENV_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.f, 114.f)), module, LunarVCO::VCA_CV_INPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
-        SolarVCO* module = dynamic_cast<SolarVCO*>(this->module);
+        LunarVCO* module = dynamic_cast<LunarVCO*>(this->module);
         assert(module);
 
         menu->addChild(new MenuSeparator);
@@ -180,10 +180,10 @@ struct SolarVCOWidget : ModuleWidget {
             [=]() { return module->theme; },
             [=](int theme) {
                 module->theme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarVCO", theme))));
+                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarVCO", theme))));
             }
         ));
     }
 };
 
-Model* modelSolarVCO = createModel<SolarVCO, SolarVCOWidget>("SolarVCO");
+Model* modelLunarVCO = createModel<LunarVCO, LunarVCOWidget>("LunarVCO");

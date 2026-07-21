@@ -2,7 +2,7 @@
 #include "dsp/TriSquareLFO.hpp"
 #include "PanelTheme.hpp"
 
-struct SolarLFO : Module {
+struct LunarLFO : Module {
     int theme = 0;
 
     enum ParamIds {
@@ -34,14 +34,14 @@ struct SolarLFO : Module {
         return dsp::approxExp2_taylor5(octaves + 30.f) / std::pow(2.f, 30.f);
     }
 
-    SolarLFO() {
+    LunarLFO() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS);
         configParam(RATE_A_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, 0.f, "LFO A rate", " Hz", 2.f, 1.f);
-        configParam(WAVE_A_PARAM, 0.f, 1.f, 0.5f, "LFO A wave (triangle..square)");
+        configParam(WAVE_A_PARAM, 0.f, 1.f, 0.f, "LFO A wave (triangle..square)");
         configOutput(LFO_A_OUTPUT, "LFO A");
 
         configParam(RATE_B_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, 0.f, "LFO B rate", " Hz", 2.f, 1.f);
-        configParam(WAVE_B_PARAM, 0.f, 1.f, 0.5f, "LFO B wave (triangle..square)");
+        configParam(WAVE_B_PARAM, 0.f, 1.f, 0.f, "LFO B wave (triangle..square)");
         configOutput(LFO_B_OUTPUT, "LFO B");
     }
 
@@ -77,29 +77,27 @@ struct SolarLFO : Module {
     }
 };
 
-struct SolarLFOWidget : ModuleWidget {
-    SolarLFOWidget(SolarLFO* module) {
+struct LunarLFOWidget : ModuleWidget {
+    LunarLFOWidget(LunarLFO* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarLFO", module ? module->theme : 0))));
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarLFO", module ? module->theme : 0))));
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
-        //addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-        //addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // Single narrow column — placeholder coordinates, panel layout WIP in Inkscape.
         const float x = 10.16f;
-        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 25.f)), module, SolarLFO::RATE_A_PARAM));
-        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 44.0f)), module, SolarLFO::WAVE_A_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 59.5f)), module, SolarLFO::LFO_A_OUTPUT));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 25.f)), module, LunarLFO::RATE_A_PARAM));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 44.0f)), module, LunarLFO::WAVE_A_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 59.5f)), module, LunarLFO::LFO_A_OUTPUT));
 
-        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 78.5f)), module, SolarLFO::RATE_B_PARAM));
-        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 97.5f)), module, SolarLFO::WAVE_B_PARAM));        
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 113.f)), module, SolarLFO::LFO_B_OUTPUT));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 78.5f)), module, LunarLFO::RATE_B_PARAM));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(x, 97.5f)), module, LunarLFO::WAVE_B_PARAM));        
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 113.f)), module, LunarLFO::LFO_B_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
-        SolarLFO* module = dynamic_cast<SolarLFO*>(this->module);
+        LunarLFO* module = dynamic_cast<LunarLFO*>(this->module);
         assert(module);
 
         menu->addChild(new MenuSeparator);
@@ -107,10 +105,10 @@ struct SolarLFOWidget : ModuleWidget {
             [=]() { return module->theme; },
             [=](int theme) {
                 module->theme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarLFO", theme))));
+                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarLFO", theme))));
             }
         ));
     }
 };
 
-Model* modelSolarLFO = createModel<SolarLFO, SolarLFOWidget>("SolarLFO");
+Model* modelLunarLFO = createModel<LunarLFO, LunarLFOWidget>("LunarLFO");

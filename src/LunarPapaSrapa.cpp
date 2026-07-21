@@ -3,7 +3,7 @@
 #include "dsp/AREnvelope.hpp"
 #include "PanelTheme.hpp"
 
-struct SolarPapaSrapa : Module {
+struct LunarPapaSrapa : Module {
     static constexpr float OUTPUT_VOLTAGE = 5.f; // Eurorack +-5V audio convention
     static constexpr float RATE_MIN_OCT = -8.f;
     static constexpr float RATE_MAX_OCT = 4.f;
@@ -49,7 +49,7 @@ struct SolarPapaSrapa : Module {
     dsp::SchmittTrigger clockTrigger;
     float shValue = 0.f;
 
-    SolarPapaSrapa() {
+    LunarPapaSrapa() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
         configParam(RATE_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, -2.f, "Modulator rate", " Hz", 2.f, 1.f);
@@ -100,12 +100,12 @@ struct SolarPapaSrapa : Module {
                                     : am ? PapaSrapaCore::MODE_AM
                                     : PapaSrapaCore::MODE_OFF;
 
-        // Unlike Solar50Drone's oscillator bank, this core is already cheap
+        // Unlike Lunar50Drone's oscillator bank, this core is already cheap
         // (2 square oscillators + a noise sample, no sin/asin) and the noise
         // sample must stay continuously fresh for the S&H below even when
         // the envelope is at 0 (silent gate) or DRY_OUTPUT is the only thing
-        // patched — so it always runs, matching SolarVCO's approach rather
-        // than Solar50Drone's envelope-gated skip.
+        // patched — so it always runs, matching LunarVCO's approach rather
+        // than Lunar50Drone's envelope-gated skip.
         float dry = core.process(args.sampleTime, args.sampleRate, rateOctaves,
             params[DIVIDER_PARAM].getValue(), pitchOctaves, params[MOD_PARAM].getValue(),
             mode, params[NOISE_PARAM].getValue());
@@ -130,44 +130,44 @@ struct SolarPapaSrapa : Module {
     }
 };
 
-struct SolarPapaSrapaWidget : ModuleWidget {
-    SolarPapaSrapaWidget(SolarPapaSrapa* module) {
+struct LunarPapaSrapaWidget : ModuleWidget {
+    LunarPapaSrapaWidget(LunarPapaSrapa* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarPapaSrapa", module ? module->theme : 0))));
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarPapaSrapa", module ? module->theme : 0))));
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(10.f, 20.f)), module, SolarPapaSrapa::RATE_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(20.f, 20.f)), module, SolarPapaSrapa::RATE_RANGE_PARAM));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(32.f, 20.f)), module, SolarPapaSrapa::PITCH_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(42.f, 20.f)), module, SolarPapaSrapa::PITCH_RANGE_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(10.f, 20.f)), module, LunarPapaSrapa::RATE_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(20.f, 20.f)), module, LunarPapaSrapa::RATE_RANGE_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(32.f, 20.f)), module, LunarPapaSrapa::PITCH_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(42.f, 20.f)), module, LunarPapaSrapa::PITCH_RANGE_PARAM));
 
-        addParam(createParamCentered<CKSS>(mm2px(Vec(12.f, 35.f)), module, SolarPapaSrapa::FM_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(22.f, 35.f)), module, SolarPapaSrapa::AM_PARAM));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(32.f, 35.f)), module, SolarPapaSrapa::MOD_PARAM));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(42.f, 35.f)), module, SolarPapaSrapa::DIVIDER_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(12.f, 35.f)), module, LunarPapaSrapa::FM_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(22.f, 35.f)), module, LunarPapaSrapa::AM_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(32.f, 35.f)), module, LunarPapaSrapa::MOD_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(42.f, 35.f)), module, LunarPapaSrapa::DIVIDER_PARAM));
 
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(15.f, 50.f)), module, SolarPapaSrapa::NOISE_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(15.f, 50.f)), module, LunarPapaSrapa::NOISE_PARAM));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.f, 65.f)), module, SolarPapaSrapa::GATE_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.f, 65.f)), module, SolarPapaSrapa::SH_CLOCK_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.f, 65.f)), module, SolarPapaSrapa::SH_INPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(40.f, 65.f)), module, SolarPapaSrapa::SH_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.f, 65.f)), module, LunarPapaSrapa::GATE_INPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.f, 65.f)), module, LunarPapaSrapa::SH_CLOCK_INPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.f, 65.f)), module, LunarPapaSrapa::SH_INPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(40.f, 65.f)), module, LunarPapaSrapa::SH_OUTPUT));
 
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(10.f, 80.f)), module, SolarPapaSrapa::ATTACK_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(22.f, 80.f)), module, SolarPapaSrapa::RELEASE_PARAM));
-        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(34.f, 80.f)), module, SolarPapaSrapa::HOLD_PARAM, SolarPapaSrapa::HOLD_LIGHT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(46.f, 80.f)), module, SolarPapaSrapa::ENV_OUTPUT));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(10.f, 80.f)), module, LunarPapaSrapa::ATTACK_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(22.f, 80.f)), module, LunarPapaSrapa::RELEASE_PARAM));
+        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(34.f, 80.f)), module, LunarPapaSrapa::HOLD_PARAM, LunarPapaSrapa::HOLD_LIGHT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(46.f, 80.f)), module, LunarPapaSrapa::ENV_OUTPUT));
 
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 100.f)), module, SolarPapaSrapa::DRY_OUTPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(35.f, 100.f)), module, SolarPapaSrapa::MAIN_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 100.f)), module, LunarPapaSrapa::DRY_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(35.f, 100.f)), module, LunarPapaSrapa::MAIN_OUTPUT));
     }
 
     void appendContextMenu(Menu* menu) override {
-        SolarPapaSrapa* module = dynamic_cast<SolarPapaSrapa*>(this->module);
+        LunarPapaSrapa* module = dynamic_cast<LunarPapaSrapa*>(this->module);
         assert(module);
 
         menu->addChild(new MenuSeparator);
@@ -175,10 +175,10 @@ struct SolarPapaSrapaWidget : ModuleWidget {
             [=]() { return module->theme; },
             [=](int theme) {
                 module->theme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("SolarPapaSrapa", theme))));
+                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarPapaSrapa", theme))));
             }
         ));
     }
 };
 
-Model* modelSolarPapaSrapa = createModel<SolarPapaSrapa, SolarPapaSrapaWidget>("SolarPapaSrapa");
+Model* modelLunarPapaSrapa = createModel<LunarPapaSrapa, LunarPapaSrapaWidget>("LunarPapaSrapa");

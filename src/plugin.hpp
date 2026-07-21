@@ -6,7 +6,7 @@ using namespace rack;
 extern Plugin *pluginInstance;
 
 extern Model *modelBlank;
-extern Model *modelSolar50Drone;
-extern Model *modelSolarLFO;
-extern Model *modelSolarVCO;
-extern Model *modelSolarPapaSrapa;
+extern Model *modelLunar50Drone;
+extern Model *modelLunarLFO;
+extern Model *modelLunarVCO;
+extern Model *modelLunarPapaSrapa;
