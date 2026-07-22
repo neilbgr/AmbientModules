@@ -161,8 +161,8 @@ struct Lunar50DroneWidget : ModuleWidget {
         addParam(createParamCentered<Trimpot>(mm2px(Vec(48.f, 72.f)), module, Lunar50Drone::ATTEN_PARAM));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(48.f, 83.f)), module, Lunar50Drone::CV_INPUT));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 76.25f)), module, Lunar50Drone::VOLT_CV_INPUT));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(28.75f, 76.25f)), module, Lunar50Drone::VOLT_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 76.75f)), module, Lunar50Drone::VOLT_CV_INPUT));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(28.75f, 76.75f)), module, Lunar50Drone::VOLT_PARAM));
 
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 98.f)), module, Lunar50Drone::ENV_INPUT));
         addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(24.f, 98.f)), module, Lunar50Drone::ATTACK_PARAM));
