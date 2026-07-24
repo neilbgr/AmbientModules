@@ -18,21 +18,30 @@ struct LunarVCOCore {
     float subPhase = 0.f;
     dsp::SchmittTrigger syncTrigger;
 
-    // pitchOctaves: tune + octave switch + 1V/oct input, already summed by the caller.
+    // pitchOctaves: tune + 1V/oct input, already summed by the caller.
     // expFmOctaves: exponential secondary-CV contribution (added to pitch), 0 if in lin mode.
     // linFmHz: linear secondary-CV contribution (added directly in Hz), 0 if in exp mode.
     // waveform: 0..5 (see enum above). shape: 0..1 (pulse width or morph blend, see above).
+    // octaveOn: multiplies frequency by 8 (+3 octaves) if true.
     // subOscOn: mixes an additional square wave one octave below into the output.
     // syncInput: raw voltage of the hard sync jack.
     // Returns the oscillator's dry output in roughly [-1, 1] (sub included).
     float process(float sampleTime, float sampleRate, float pitchOctaves,
                    float expFmOctaves, float linFmHz, int waveform, float shape,
-                   bool subOscOn, float syncInput) {
+                   bool octaveOn, bool subOscOn, float syncInput) {
+        
+        float subFreq = 0.f;
         float freq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitchOctaves + expFmOctaves + 30.f) / std::pow(2.f, 30.f);
         freq += linFmHz;
+        if (subOscOn) {
+            subFreq = freq * 0.5f; // one octave below
+        }
+        if (octaveOn) {            
+            freq *= 8.f; // +3 octaves
+        }
         freq = clamp(freq, 0.f, sampleRate / 2.f);
 
-        if (syncTrigger.process(syncInput)) {
+        if (syncTrigger.process(syncInput, -0.25f, 0.25f)) {
             phase = 0.f;
         }
 
@@ -82,7 +91,7 @@ struct LunarVCOCore {
         }
 
         if (subOscOn) {
-            subPhase += 0.5f * freq * sampleTime; // one octave below
+            subPhase += subFreq * sampleTime;
             subPhase -= std::floor(subPhase);
             out += (subPhase < 0.5f) ? 1.f : -1.f;
             out *= 0.5f; // keep overall level in check with the sub mixed in
