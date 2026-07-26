@@ -131,9 +131,11 @@ struct LunarPapaSrapa : Module {
 };
 
 struct LunarPapaSrapaWidget : ModuleWidget {
+    int appliedTheme = -1;
+
     LunarPapaSrapaWidget(LunarPapaSrapa* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarPapaSrapa", module ? module->theme : 0))));
+        syncPanelTheme(this, "LunarPapaSrapa", module ? module->theme : 0, appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -166,6 +168,11 @@ struct LunarPapaSrapaWidget : ModuleWidget {
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(35.f, 100.f)), module, LunarPapaSrapa::MAIN_OUTPUT));
     }
 
+    void step() override {
+        if (module) syncPanelTheme(this, "LunarPapaSrapa", dynamic_cast<LunarPapaSrapa*>(module)->theme, appliedTheme);
+        ModuleWidget::step();
+    }
+
     void appendContextMenu(Menu* menu) override {
         LunarPapaSrapa* module = dynamic_cast<LunarPapaSrapa*>(this->module);
         assert(module);
@@ -174,7 +181,10 @@ struct LunarPapaSrapaWidget : ModuleWidget {
         menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
             [=]() { return module->theme; },
             [=](int theme) {
+                pushIntFieldChange(module, "change theme", module->theme, theme,
+                    [](engine::Module* m, int v) { dynamic_cast<LunarPapaSrapa*>(m)->theme = v; });
                 module->theme = theme;
+                appliedTheme = theme;
                 setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarPapaSrapa", theme))));
             }
         ));

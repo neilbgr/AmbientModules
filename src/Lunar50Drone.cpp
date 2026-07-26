@@ -140,9 +140,11 @@ struct Lunar50Drone : Module {
 };
 
 struct Lunar50DroneWidget : ModuleWidget {
+    int appliedTheme = -1;
+
     Lunar50DroneWidget(Lunar50Drone* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Lunar50Drone", module ? module->theme : 0))));
+        syncPanelTheme(this, "Lunar50Drone", module ? module->theme : 0, appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -174,6 +176,11 @@ struct Lunar50DroneWidget : ModuleWidget {
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 113.f)), module, Lunar50Drone::SAW_OUTPUT));
     }
 
+    void step() override {
+        if (module) syncPanelTheme(this, "Lunar50Drone", dynamic_cast<Lunar50Drone*>(module)->theme, appliedTheme);
+        ModuleWidget::step();
+    }
+
     void appendContextMenu(Menu* menu) override {
         Lunar50Drone* module = dynamic_cast<Lunar50Drone*>(this->module);
         assert(module);
@@ -182,11 +189,21 @@ struct Lunar50DroneWidget : ModuleWidget {
         menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
             [=]() { return module->theme; },
             [=](int theme) {
+                pushIntFieldChange(module, "change theme", module->theme, theme,
+                    [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->theme = v; });
                 module->theme = theme;
+                appliedTheme = theme;
                 setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Lunar50Drone", theme))));
             }
         ));
-        menu->addChild(createIndexPtrSubmenuItem("FM topology", {"Average of active others", "Circular chain"}, &module->voice.fmTopology));
+        menu->addChild(createIndexSubmenuItem("FM topology", {"Average of active others", "Circular chain"},
+            [=]() { return module->voice.fmTopology; },
+            [=](int topology) {
+                pushIntFieldChange(module, "change FM topology", module->voice.fmTopology, topology,
+                    [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->voice.fmTopology = v; });
+                module->voice.fmTopology = topology;
+            }
+        ));
     }
 };
 

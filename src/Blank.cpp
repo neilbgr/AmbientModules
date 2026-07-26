@@ -23,12 +23,19 @@ struct Blank : Module {
 };
 
 struct BlankWidget : ModuleWidget {
+    int appliedTheme = -1;
+
     BlankWidget(Blank* module) {
         setModule(module);
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Blank", module ? module->theme : 0))));
+        syncPanelTheme(this, "Blank", module ? module->theme : 0, appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(box.size.x / 2 - RACK_GRID_WIDTH / 2, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x / 2 - RACK_GRID_WIDTH / 2, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+    }
+
+    void step() override {
+        if (module) syncPanelTheme(this, "Blank", dynamic_cast<Blank*>(module)->theme, appliedTheme);
+        ModuleWidget::step();
     }
 
     void appendContextMenu(Menu* menu) override {
@@ -39,7 +46,10 @@ struct BlankWidget : ModuleWidget {
         menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
             [=]() { return module->theme; },
             [=](int theme) {
+                pushIntFieldChange(module, "change theme", module->theme, theme,
+                    [](engine::Module* m, int v) { dynamic_cast<Blank*>(m)->theme = v; });
                 module->theme = theme;
+                appliedTheme = theme;
                 setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Blank", theme))));
             }
         ));
