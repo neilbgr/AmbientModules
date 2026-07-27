@@ -3,6 +3,20 @@
 
 using namespace rack;
 
+// Classic 2-piece PolyBLEP correction (Valimaki/Huovilainen-style), applied
+// near a waveform's hard discontinuity (t = phase distance from the edge,
+// dt = phase increment per sample) to band-limit it without oversampling.
+static inline float polyBlep(float t, float dt) {
+    if (t < dt) {
+        t /= dt;
+        return t + t - t * t - 1.f;
+    } else if (t > 1.f - dt) {
+        t = (t - 1.f) / dt;
+        return t * t + t + t + 1.f;
+    }
+    return 0.f;
+}
+
 // One "AS3340-style" VCO voice: 6 discrete waveforms (4 fixed + 2 morphing),
 // tune/octave/sub, lin or exp secondary FM input, hard sync. Pure DSP, no
 // Module/param/light dependency.
@@ -45,7 +59,8 @@ struct LunarVCOCore {
             phase = 0.f;
         }
 
-        phase += freq * sampleTime;
+        float dt = freq * sampleTime;
+        phase += dt;
         phase -= std::floor(phase);
 
         float saw = 2.f * phase - 1.f;
@@ -58,10 +73,15 @@ struct LunarVCOCore {
                 out = (phase < 0.5f) ? (4.f * phase - 1.f) : (3.f - 4.f * phase);
                 break;
             case WAVE_INV_SAW:
-                out = -saw;
+                // Ramp resets (falls back to +1) at phase == 0 — PolyBLEP-correct that edge.
+                out = -saw + polyBlep(phase, dt);
                 break;
             case WAVE_SQUARE:
-                out = (phase < shape) ? 1.f : -1.f; // shape = pulse width here
+                // shape = pulse width here; two hard edges per cycle (rise at
+                // phase == 0, fall at phase == shape) — correct both.
+                out = (phase < shape) ? 1.f : -1.f;
+                out += polyBlep(phase, dt);
+                out -= polyBlep(std::fmod(phase - shape + 1.f, 1.f), dt);
                 break;
             case WAVE_SAW_MORPH: {
                 // shape 0 = rising saw, 0.5 = symmetric triangle, 1 = falling
@@ -91,9 +111,13 @@ struct LunarVCOCore {
         }
 
         if (subOscOn) {
-            subPhase += subFreq * sampleTime;
+            float subDt = subFreq * sampleTime;
+            subPhase += subDt;
             subPhase -= std::floor(subPhase);
-            out += (subPhase < 0.5f) ? 1.f : -1.f;
+            float sub = (subPhase < 0.5f) ? 1.f : -1.f;
+            sub += polyBlep(subPhase, subDt);
+            sub -= polyBlep(std::fmod(subPhase - 0.5f + 1.f, 1.f), subDt);
+            out += sub;
             out *= 0.5f; // keep overall level in check with the sub mixed in
         }
 
