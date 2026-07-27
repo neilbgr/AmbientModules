@@ -46,8 +46,8 @@ struct LunarVCO : Module {
         NUM_LIGHTS
     };
 
-    LunarVCOCore vco;
-    ADSREnvelope env;
+    LunarVCOCore vco[PORT_MAX_CHANNELS];
+    ADSREnvelope env[PORT_MAX_CHANNELS];
 
     LunarVCO() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -92,39 +92,58 @@ struct LunarVCO : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float pitch = params[TUNE_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage();
+        int channels = std::max(inputs[VOCT_INPUT].getChannels(), 1);
 
         bool expMode = params[LINEXP_PARAM].getValue() > 0.f;
-        float fmCv = inputs[FM_INPUT].getVoltage() * params[FM_CV_ATTEN_PARAM].getValue();
-        float expFm = expMode ? fmCv : 0.f;
-        float linFm = expMode ? 0.f : fmCv * 100.f; // Hz scale, adjustable by ear
+        bool octaveOn = params[OCTAVE_PARAM].getValue() > 0.f;
+        bool subOscOn = params[SUB_PARAM].getValue() > 0.f;
+        bool hold = params[HOLD_PARAM].getValue() > 0.f;
+        bool selfGen = params[SELFGEN_PARAM].getValue() > 0.f;
+        int waveform = (int)params[WAVEFORM_PARAM].getValue();
+        float tune = params[TUNE_PARAM].getValue();
+        float shapeParam = params[SHAPE_PARAM].getValue();
+        float shapeCvAtten = params[SHAPE_CV_ATTEN_PARAM].getValue();
+        float fmCvAtten = params[FM_CV_ATTEN_PARAM].getValue();
+        float attack = params[ATTACK_PARAM].getValue();
+        float decay = params[DECAY_PARAM].getValue();
+        float sustain = params[SUSTAIN_PARAM].getValue();
+        float release = params[RELEASE_PARAM].getValue();
+        bool envInputConnected = inputs[ENV_INPUT].isConnected();
 
-        float shape = clamp(params[SHAPE_PARAM].getValue()
-            + inputs[SHAPE_CV_INPUT].getVoltage() / 10.f * params[SHAPE_CV_ATTEN_PARAM].getValue(), 0.f, 1.f);
+        float maxEnvValue = 0.f;
+        for (int c = 0; c < channels; c++) {
+            float pitch = tune + inputs[VOCT_INPUT].getPolyVoltage(c);
 
-        float dry = vco.process(args.sampleTime, args.sampleRate, pitch, expFm, linFm,
-            (int)params[WAVEFORM_PARAM].getValue(), shape,
-            params[OCTAVE_PARAM].getValue() > 0.f, params[SUB_PARAM].getValue() > 0.f, inputs[SYNC_INPUT].getVoltage());
+            float fmCv = inputs[FM_INPUT].getPolyVoltage(c) * fmCvAtten;
+            float expFm = expMode ? fmCv : 0.f;
+            float linFm = expMode ? 0.f : fmCv * 100.f; // Hz scale, adjustable by ear
 
-        float envValue;
-        if (inputs[ENV_INPUT].isConnected()) {
-            envValue = clamp(inputs[ENV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
-        } else {
-            bool gate = inputs[GATE_INPUT].getVoltage() >= 1.f;
-            envValue = env.process(args.sampleTime, gate,
-                params[SELFGEN_PARAM].getValue() > 0.f, params[HOLD_PARAM].getValue() > 0.f,
-                params[ATTACK_PARAM].getValue(), params[DECAY_PARAM].getValue(),
-                params[SUSTAIN_PARAM].getValue(), params[RELEASE_PARAM].getValue());
+            float shape = clamp(shapeParam
+                + inputs[SHAPE_CV_INPUT].getPolyVoltage(c) / 10.f * shapeCvAtten, 0.f, 1.f);
+
+            float dry = vco[c].process(args.sampleTime, args.sampleRate, pitch, expFm, linFm,
+                waveform, shape, octaveOn, subOscOn, inputs[SYNC_INPUT].getPolyVoltage(c));
+
+            float envValue;
+            if (envInputConnected) {
+                envValue = clamp(inputs[ENV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
+            } else {
+                bool gate = inputs[GATE_INPUT].getPolyVoltage(c) >= 1.f;
+                envValue = env[c].process(args.sampleTime, gate, selfGen, hold, attack, decay, sustain, release);
+            }
+            maxEnvValue = std::max(maxEnvValue, envValue);
+
+            outputs[VCO_OUTPUT].setVoltage(dry * 5.f * envValue, c);
+            outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
         }
+        outputs[VCO_OUTPUT].setChannels(channels);
+        outputs[ENV_OUTPUT].setChannels(channels);
 
-        lights[OCTAVE_LIGHT].setBrightness(params[OCTAVE_PARAM].getValue() > 0.f ? 1.f : 0.f);
-        lights[SUB_LIGHT].setBrightness(params[SUB_PARAM].getValue() > 0.f ? 1.f : 0.f);
-        lights[LINEXP_LIGHT].setBrightness(params[LINEXP_PARAM].getValue() > 0.f ? 1.f : 0.f);
-        lights[HOLD_LIGHT].setBrightness(envValue);
-        lights[SELFGEN_LIGHT].setBrightness(params[SELFGEN_PARAM].getValue() > 0.f ? 1.f : 0.f);
-
-        outputs[VCO_OUTPUT].setVoltage(dry * 5.f * envValue);
-        outputs[ENV_OUTPUT].setVoltage(envValue * 10.f);
+        lights[OCTAVE_LIGHT].setBrightness(octaveOn ? 1.f : 0.f);
+        lights[SUB_LIGHT].setBrightness(subOscOn ? 1.f : 0.f);
+        lights[LINEXP_LIGHT].setBrightness(expMode ? 1.f : 0.f);
+        lights[HOLD_LIGHT].setBrightness(maxEnvValue);
+        lights[SELFGEN_LIGHT].setBrightness(selfGen ? 1.f : 0.f);
     }
 };
 
