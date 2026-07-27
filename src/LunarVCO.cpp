@@ -128,7 +128,7 @@ struct LunarVCO : Module {
     }
 };
 
-struct LunarVCOWidget : ModuleWidget {
+struct LunarVCOWidget : ModuleWidget, ThemedModuleWidget {
     int appliedTheme = -1;
 
     LunarVCOWidget(LunarVCO* module) {
@@ -197,6 +197,15 @@ struct LunarVCOWidget : ModuleWidget {
         ModuleWidget::step();
     }
 
+    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
+        LunarVCO* module = dynamic_cast<LunarVCO*>(this->module);
+        pushIntFieldChange(module, "change theme", module->theme, theme,
+            [](engine::Module* m, int v) { dynamic_cast<LunarVCO*>(m)->theme = v; }, complexAction);
+        module->theme = theme;
+        appliedTheme = theme;
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarVCO", theme))));
+    }
+
     void appendContextMenu(Menu* menu) override {
         LunarVCO* module = dynamic_cast<LunarVCO*>(this->module);
         assert(module);
@@ -204,14 +213,9 @@ struct LunarVCOWidget : ModuleWidget {
         menu->addChild(new MenuSeparator);
         menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
             [=]() { return module->theme; },
-            [=](int theme) {
-                pushIntFieldChange(module, "change theme", module->theme, theme,
-                    [](engine::Module* m, int v) { dynamic_cast<LunarVCO*>(m)->theme = v; });
-                module->theme = theme;
-                appliedTheme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarVCO", theme))));
-            }
+            [=](int theme) { applyTheme(theme); }
         ));
+        appendApplyThemeToAllItem(menu, module->theme);
     }
 };
 

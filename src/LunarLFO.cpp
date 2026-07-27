@@ -77,7 +77,7 @@ struct LunarLFO : Module {
     }
 };
 
-struct LunarLFOWidget : ModuleWidget {
+struct LunarLFOWidget : ModuleWidget, ThemedModuleWidget {
     int appliedTheme = -1;
 
     LunarLFOWidget(LunarLFO* module) {
@@ -103,6 +103,15 @@ struct LunarLFOWidget : ModuleWidget {
         ModuleWidget::step();
     }
 
+    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
+        LunarLFO* module = dynamic_cast<LunarLFO*>(this->module);
+        pushIntFieldChange(module, "change theme", module->theme, theme,
+            [](engine::Module* m, int v) { dynamic_cast<LunarLFO*>(m)->theme = v; }, complexAction);
+        module->theme = theme;
+        appliedTheme = theme;
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarLFO", theme))));
+    }
+
     void appendContextMenu(Menu* menu) override {
         LunarLFO* module = dynamic_cast<LunarLFO*>(this->module);
         assert(module);
@@ -110,14 +119,9 @@ struct LunarLFOWidget : ModuleWidget {
         menu->addChild(new MenuSeparator);
         menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
             [=]() { return module->theme; },
-            [=](int theme) {
-                pushIntFieldChange(module, "change theme", module->theme, theme,
-                    [](engine::Module* m, int v) { dynamic_cast<LunarLFO*>(m)->theme = v; });
-                module->theme = theme;
-                appliedTheme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarLFO", theme))));
-            }
+            [=](int theme) { applyTheme(theme); }
         ));
+        appendApplyThemeToAllItem(menu, module->theme);
     }
 };
 

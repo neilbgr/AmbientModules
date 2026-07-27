@@ -22,7 +22,7 @@ struct Blank : Module {
     }
 };
 
-struct BlankWidget : ModuleWidget {
+struct BlankWidget : ModuleWidget, ThemedModuleWidget {
     int appliedTheme = -1;
 
     BlankWidget(Blank* module) {
@@ -38,6 +38,15 @@ struct BlankWidget : ModuleWidget {
         ModuleWidget::step();
     }
 
+    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
+        Blank* module = dynamic_cast<Blank*>(this->module);
+        pushIntFieldChange(module, "change theme", module->theme, theme,
+            [](engine::Module* m, int v) { dynamic_cast<Blank*>(m)->theme = v; }, complexAction);
+        module->theme = theme;
+        appliedTheme = theme;
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Blank", theme))));
+    }
+
     void appendContextMenu(Menu* menu) override {
         Blank* module = dynamic_cast<Blank*>(this->module);
         assert(module);
@@ -45,14 +54,9 @@ struct BlankWidget : ModuleWidget {
         menu->addChild(new MenuSeparator);
         menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
             [=]() { return module->theme; },
-            [=](int theme) {
-                pushIntFieldChange(module, "change theme", module->theme, theme,
-                    [](engine::Module* m, int v) { dynamic_cast<Blank*>(m)->theme = v; });
-                module->theme = theme;
-                appliedTheme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Blank", theme))));
-            }
+            [=](int theme) { applyTheme(theme); }
         ));
+        appendApplyThemeToAllItem(menu, module->theme);
     }
 };
 

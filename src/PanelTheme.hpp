@@ -50,7 +50,8 @@ struct IntFieldChange : history::ModuleAction {
 };
 
 static inline void pushIntFieldChange(engine::Module* module, const std::string& actionName, int oldValue, int newValue,
-                                       std::function<void(engine::Module*, int)> apply) {
+                                       std::function<void(engine::Module*, int)> apply,
+                                       history::ComplexAction* complexAction = nullptr) {
     if (oldValue == newValue) return;
     IntFieldChange* h = new IntFieldChange;
     h->name = actionName;
@@ -58,5 +59,31 @@ static inline void pushIntFieldChange(engine::Module* module, const std::string&
     h->oldValue = oldValue;
     h->newValue = newValue;
     h->apply = apply;
-    APP->history->push(h);
+    if (complexAction) complexAction->push(h);
+    else APP->history->push(h);
+}
+
+// Mixin implemented by every AmbientModules ModuleWidget that has a theme, so
+// "apply to all" can reach each one without a per-type dynamic_cast chain.
+struct ThemedModuleWidget {
+    virtual ~ThemedModuleWidget() = default;
+    virtual void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) = 0;
+};
+
+// Batches every module's theme change into one history::ComplexAction, so a
+// single undo reverts the whole "apply to all" instead of one step per module.
+static inline void appendApplyThemeToAllItem(Menu* menu, int currentTheme) {
+    menu->addChild(createMenuItem("Apply theme to all AmbientModules", "", [=]() {
+        history::ComplexAction* complexAction = new history::ComplexAction;
+        complexAction->name = "apply theme to all panels";
+        for (ModuleWidget* mw : APP->scene->rack->getModules()) {
+            if (!mw->model || mw->model->plugin != pluginInstance) continue;
+            if (ThemedModuleWidget* themed = dynamic_cast<ThemedModuleWidget*>(mw))
+                themed->applyTheme(currentTheme, complexAction);
+        }
+        if (!complexAction->isEmpty())
+            APP->history->push(complexAction);
+        else
+            delete complexAction;
+    }));
 }

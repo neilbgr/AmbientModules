@@ -139,7 +139,7 @@ struct Lunar50Drone : Module {
     }
 };
 
-struct Lunar50DroneWidget : ModuleWidget {
+struct Lunar50DroneWidget : ModuleWidget, ThemedModuleWidget {
     int appliedTheme = -1;
 
     Lunar50DroneWidget(Lunar50Drone* module) {
@@ -181,6 +181,15 @@ struct Lunar50DroneWidget : ModuleWidget {
         ModuleWidget::step();
     }
 
+    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
+        Lunar50Drone* module = dynamic_cast<Lunar50Drone*>(this->module);
+        pushIntFieldChange(module, "change theme", module->theme, theme,
+            [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->theme = v; }, complexAction);
+        module->theme = theme;
+        appliedTheme = theme;
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Lunar50Drone", theme))));
+    }
+
     void appendContextMenu(Menu* menu) override {
         Lunar50Drone* module = dynamic_cast<Lunar50Drone*>(this->module);
         assert(module);
@@ -188,14 +197,9 @@ struct Lunar50DroneWidget : ModuleWidget {
         menu->addChild(new MenuSeparator);
         menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
             [=]() { return module->theme; },
-            [=](int theme) {
-                pushIntFieldChange(module, "change theme", module->theme, theme,
-                    [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->theme = v; });
-                module->theme = theme;
-                appliedTheme = theme;
-                setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Lunar50Drone", theme))));
-            }
+            [=](int theme) { applyTheme(theme); }
         ));
+        appendApplyThemeToAllItem(menu, module->theme);
         menu->addChild(createIndexSubmenuItem("FM topology", {"Average of active others", "Circular chain"},
             [=]() { return module->voice.fmTopology; },
             [=](int topology) {
