@@ -23,7 +23,7 @@
       "slug": "Lunar50Drone",
       "name": "Lunar50Drone",
       "description": "5-oscillator sawtooth drone VCO with per-oscillator frequency knobs, a shared CV input, and a CV attenuverter",
-      "tags": ["Oscillator", "VCO", "Drone", "Synth voice"]
+      "tags": ["Oscillator", "VCO", "Drone", "Synth voice", "Polyphonic"]
     },
     {
       "slug": "LunarLFO",
@@ -35,7 +35,7 @@
       "slug": "LunarVCO",
       "name": "LunarVCO",
       "description": "AS3340-style VCO with 6 waveforms (4 fixed + 2 morphing via shape), octave/sub/lin-exp switches, hard sync, and a full ADSR envelope with Hold and Self-generation",
-      "tags": ["VCO", "Oscillator", "Envelope generator"]
+      "tags": ["VCO", "Oscillator", "Envelope generator", "Polyphonic"]
     },
     {
       "slug": "LunarPapaSrapa",

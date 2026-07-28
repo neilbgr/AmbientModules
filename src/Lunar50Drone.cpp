@@ -40,10 +40,10 @@ struct Lunar50Drone : Module {
         NUM_LIGHTS
     };
 
-    DroneVoice voice;
+    DroneVoice voice[PORT_MAX_CHANNELS];
     dsp::SchmittTrigger trigTrigger[NUM_OSC];
-    AREnvelope envelope;
-    dsp::SchmittTrigger gateTrigger;
+    AREnvelope envelope[PORT_MAX_CHANNELS];
+    dsp::SchmittTrigger gateTrigger[PORT_MAX_CHANNELS];
 
     Lunar50Drone() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -70,7 +70,7 @@ struct Lunar50Drone : Module {
 
     json_t* dataToJson() override {
         json_t* rootJ = json_object();
-        json_object_set_new(rootJ, "fmTopology", json_integer(voice.fmTopology));
+        json_object_set_new(rootJ, "fmTopology", json_integer(voice[0].fmTopology));
         json_object_set_new(rootJ, "theme", json_integer(theme));
         return rootJ;
     }
@@ -78,7 +78,8 @@ struct Lunar50Drone : Module {
     void dataFromJson(json_t* rootJ) override {
         json_t* fmTopologyJ = json_object_get(rootJ, "fmTopology");
         if (fmTopologyJ) {
-            voice.fmTopology = json_integer_value(fmTopologyJ);
+            int fmTopology = json_integer_value(fmTopologyJ);
+            for (int c = 0; c < PORT_MAX_CHANNELS; c++) voice[c].fmTopology = fmTopology;
         }
         json_t* themeJ = json_object_get(rootJ, "theme");
         if (themeJ) {
@@ -87,9 +88,9 @@ struct Lunar50Drone : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        // Same CV offset (in octaves) applied to every oscillator, so it shifts
-        // all 5 frequencies together while preserving the intervals between them.
-        float cv = inputs[CV_INPUT].getVoltage() * params[ATTEN_PARAM].getValue();
+        // Poly channel count driven by both CV and gate, so a sequencer that
+        // only sets one of the two (e.g. mono CV, poly gate) doesn't drop notes.
+        int channels = std::max(std::max(inputs[CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), 1);
 
         bool active[NUM_OSC];
         bool mod[NUM_OSC];
@@ -112,30 +113,45 @@ struct Lunar50Drone : Module {
         // ±5V CV, added to the knob and clamped back into the knob's own -1..1 range.
         float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 5.f, -1.f, 1.f);
 
-        gateTrigger.process(inputs[GATE_INPUT].getVoltage());
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
-        bool gateHigh = gateTrigger.isHigh() || holdActive;
+        float attack = params[ATTACK_PARAM].getValue();
+        float release = params[RELEASE_PARAM].getValue();
+        bool envInputConnected = inputs[ENV_INPUT].isConnected();
+        float atten = params[ATTEN_PARAM].getValue();
 
-        float envValue;
-        if (inputs[ENV_INPUT].isConnected()) {
-            envValue = inputs[ENV_INPUT].getVoltage() / 10.f;
-        } else {
-            envelope.updateCoefficients(params[ATTACK_PARAM].getValue(), params[RELEASE_PARAM].getValue());
-            envValue = envelope.process(args.sampleTime, gateHigh);
+        float maxEnvValue = 0.f;
+        for (int c = 0; c < channels; c++) {
+            // Same CV offset (in octaves) applied to every oscillator, so it shifts
+            // all 5 frequencies together while preserving the intervals between them.
+            float cv = inputs[CV_INPUT].getPolyVoltage(c) * atten;
+
+            gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
+            bool gateHigh = gateTrigger[c].isHigh() || holdActive;
+
+            float envValue;
+            if (envInputConnected) {
+                envValue = inputs[ENV_INPUT].getPolyVoltage(c) / 10.f;
+            } else {
+                envelope[c].updateCoefficients(attack, release);
+                envValue = envelope[c].process(args.sampleTime, gateHigh);
+            }
+            float envAmount = clamp(envValue, 0.f, 1.f);
+            maxEnvValue = std::max(maxEnvValue, envAmount);
+
+            // Envelope silent -> output would be zero anyway, skip the 5-oscillator engine entirely.
+            float sawOut = 0.f;
+            if (envAmount > 0.f) {
+                float mix = voice[c].process(args.sampleTime, args.sampleRate, pitchParams, active, mod, cv, volt);
+                sawOut = OUTPUT_VOLTAGE * mix / NUM_OSC * envAmount; // average of NUM_OSC oscillators, scaled to OUTPUT_VOLTAGE
+            }
+
+            outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
+            outputs[SAW_OUTPUT].setVoltage(sawOut, c);
         }
-        float envAmount = clamp(envValue, 0.f, 1.f);
+        outputs[ENV_OUTPUT].setChannels(channels);
+        outputs[SAW_OUTPUT].setChannels(channels);
 
-        lights[HOLD_LIGHT].setBrightness(envAmount);
-
-        // Envelope silent -> output would be zero anyway, skip the 5-oscillator engine entirely.
-        float sawOut = 0.f;
-        if (envAmount > 0.f) {
-            float mix = voice.process(args.sampleTime, args.sampleRate, pitchParams, active, mod, cv, volt);
-            sawOut = OUTPUT_VOLTAGE * mix / NUM_OSC * envAmount; // average of NUM_OSC oscillators, scaled to OUTPUT_VOLTAGE
-        }
-
-        outputs[ENV_OUTPUT].setVoltage(envValue * 10.f);
-        outputs[SAW_OUTPUT].setVoltage(sawOut);
+        lights[HOLD_LIGHT].setBrightness(maxEnvValue);
     }
 };
 
@@ -201,11 +217,14 @@ struct Lunar50DroneWidget : ModuleWidget, ThemedModuleWidget {
         ));
         appendApplyThemeToAllItem(menu, module->theme);
         menu->addChild(createIndexSubmenuItem("FM topology", {"Average of active others", "Circular chain"},
-            [=]() { return module->voice.fmTopology; },
+            [=]() { return module->voice[0].fmTopology; },
             [=](int topology) {
-                pushIntFieldChange(module, "change FM topology", module->voice.fmTopology, topology,
-                    [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->voice.fmTopology = v; });
-                module->voice.fmTopology = topology;
+                pushIntFieldChange(module, "change FM topology", module->voice[0].fmTopology, topology,
+                    [](engine::Module* m, int v) {
+                        Lunar50Drone* mm = dynamic_cast<Lunar50Drone*>(m);
+                        for (int c = 0; c < PORT_MAX_CHANNELS; c++) mm->voice[c].fmTopology = v;
+                    });
+                for (int c = 0; c < PORT_MAX_CHANNELS; c++) module->voice[c].fmTopology = topology;
             }
         ));
     }
