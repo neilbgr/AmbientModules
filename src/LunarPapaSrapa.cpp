@@ -142,30 +142,33 @@ struct LunarPapaSrapaWidget : ModuleWidget, ThemedModuleWidget {
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(10.f, 20.f)), module, LunarPapaSrapa::RATE_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(20.f, 20.f)), module, LunarPapaSrapa::RATE_RANGE_PARAM));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(32.f, 20.f)), module, LunarPapaSrapa::PITCH_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(42.f, 20.f)), module, LunarPapaSrapa::PITCH_RANGE_PARAM));
+        // Panel layout mirrors the "MOD" / "ENV" (gate, hold, att, rls, noise,
+        // S&H, env out) / "OUT" boxes of res/LunarPapaSrapa_Cream.svg, itself
+        // following the original Solar 42F "Papa Srapa" drone voice's control
+        // grouping (solar42f_instruct_03_25_v9.pdf, p.8).
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(10.f, 23.f)), module, LunarPapaSrapa::RATE_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(19.f, 23.f)), module, LunarPapaSrapa::RATE_RANGE_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(37.f, 23.f)), module, LunarPapaSrapa::PITCH_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(46.f, 23.f)), module, LunarPapaSrapa::PITCH_RANGE_PARAM));
 
-        addParam(createParamCentered<CKSS>(mm2px(Vec(12.f, 35.f)), module, LunarPapaSrapa::FM_PARAM));
-        addParam(createParamCentered<CKSS>(mm2px(Vec(22.f, 35.f)), module, LunarPapaSrapa::AM_PARAM));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(32.f, 35.f)), module, LunarPapaSrapa::MOD_PARAM));
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(42.f, 35.f)), module, LunarPapaSrapa::DIVIDER_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(14.f, 39.f)), module, LunarPapaSrapa::FM_PARAM));
+        addParam(createParamCentered<CKSS>(mm2px(Vec(23.f, 39.f)), module, LunarPapaSrapa::AM_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(32.f, 39.f)), module, LunarPapaSrapa::MOD_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(41.f, 39.f)), module, LunarPapaSrapa::DIVIDER_PARAM));
 
-        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(15.f, 50.f)), module, LunarPapaSrapa::NOISE_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.3f, 76.f)), module, LunarPapaSrapa::GATE_INPUT));
+        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(17.6f, 76.f)), module, LunarPapaSrapa::HOLD_PARAM, LunarPapaSrapa::HOLD_LIGHT));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(27.94f, 76.f)), module, LunarPapaSrapa::ATTACK_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(38.3f, 76.f)), module, LunarPapaSrapa::RELEASE_PARAM));
+        addParam(createParamCentered<Rogan1PSBlue>(mm2px(Vec(48.6f, 76.f)), module, LunarPapaSrapa::NOISE_PARAM));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.f, 65.f)), module, LunarPapaSrapa::GATE_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.f, 65.f)), module, LunarPapaSrapa::SH_CLOCK_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.f, 65.f)), module, LunarPapaSrapa::SH_INPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(40.f, 65.f)), module, LunarPapaSrapa::SH_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(9.f, 91.f)), module, LunarPapaSrapa::SH_CLOCK_INPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(21.f, 91.f)), module, LunarPapaSrapa::SH_INPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(35.f, 91.f)), module, LunarPapaSrapa::SH_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(47.f, 91.f)), module, LunarPapaSrapa::ENV_OUTPUT));
 
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(10.f, 80.f)), module, LunarPapaSrapa::ATTACK_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(22.f, 80.f)), module, LunarPapaSrapa::RELEASE_PARAM));
-        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(34.f, 80.f)), module, LunarPapaSrapa::HOLD_PARAM, LunarPapaSrapa::HOLD_LIGHT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(46.f, 80.f)), module, LunarPapaSrapa::ENV_OUTPUT));
-
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(15.f, 100.f)), module, LunarPapaSrapa::DRY_OUTPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(35.f, 100.f)), module, LunarPapaSrapa::MAIN_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(17.f, 107.f)), module, LunarPapaSrapa::DRY_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(39.f, 107.f)), module, LunarPapaSrapa::MAIN_OUTPUT));
     }
 
     void step() override {
