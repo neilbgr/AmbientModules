@@ -4,6 +4,9 @@
 
 struct LunarLFO : Module {
     int theme = 0;
+    int cvRangeIndex = 0; // index into cvRanges, default matches hardware (0V to +5V, oscilloscope-verified)
+
+    static constexpr float cvRanges[4][2] = { {0.f, 5.f}, {0.f, 10.f}, {-5.f, 5.f}, {-10.f, 10.f} };
 
     enum ParamIds {
         WAVE_A_PARAM,
@@ -48,6 +51,7 @@ struct LunarLFO : Module {
     json_t* dataToJson() override {
         json_t* rootJ = json_object();
         json_object_set_new(rootJ, "theme", json_integer(theme));
+        json_object_set_new(rootJ, "cvRangeIndex", json_integer(cvRangeIndex));
         return rootJ;
     }
 
@@ -56,13 +60,20 @@ struct LunarLFO : Module {
         if (themeJ) {
             theme = json_integer_value(themeJ);
         }
+        json_t* cvRangeJ = json_object_get(rootJ, "cvRangeIndex");
+        if (cvRangeJ) {
+            cvRangeIndex = json_integer_value(cvRangeJ);
+        }
     }
 
     void process(const ProcessArgs& args) override {
+        float rangeMin = cvRanges[cvRangeIndex][0];
+        float rangeMax = cvRanges[cvRangeIndex][1];
+
         if (outputs[LFO_A_OUTPUT].isConnected()) {
             float freqA = octavesToHz(params[RATE_A_PARAM].getValue());
             float valueA = lfoA.process(args.sampleTime, freqA, params[WAVE_A_PARAM].getValue());
-            outputs[LFO_A_OUTPUT].setVoltage(valueA * 10.f);
+            outputs[LFO_A_OUTPUT].setVoltage(rangeMin + valueA * (rangeMax - rangeMin));
         } else {
             lfoA.phase = 0.f;
         }
@@ -70,12 +81,14 @@ struct LunarLFO : Module {
         if (outputs[LFO_B_OUTPUT].isConnected()) {
             float freqB = octavesToHz(params[RATE_B_PARAM].getValue());
             float valueB = lfoB.process(args.sampleTime, freqB, params[WAVE_B_PARAM].getValue());
-            outputs[LFO_B_OUTPUT].setVoltage(valueB * 10.f);
+            outputs[LFO_B_OUTPUT].setVoltage(rangeMin + valueB * (rangeMax - rangeMin));
         } else {
             lfoB.phase = 0.f;
         }
     }
 };
+
+constexpr float LunarLFO::cvRanges[4][2];
 
 struct LunarLFOWidget : ModuleWidget, ThemedModuleWidget {
     int appliedTheme = -1;
@@ -122,6 +135,16 @@ struct LunarLFOWidget : ModuleWidget, ThemedModuleWidget {
             [=](int theme) { applyTheme(theme); }
         ));
         appendApplyThemeToAllItem(menu, module->theme);
+
+        menu->addChild(createIndexSubmenuItem("CV Range",
+            {"0V to +5V", "0V to +10V", "-5V to +5V", "-10V to +10V"},
+            [=]() { return module->cvRangeIndex; },
+            [=](int index) {
+                pushIntFieldChange(module, "change CV range", module->cvRangeIndex, index,
+                    [](engine::Module* m, int v) { dynamic_cast<LunarLFO*>(m)->cvRangeIndex = v; });
+                module->cvRangeIndex = index;
+            }
+        ));
     }
 };
 
