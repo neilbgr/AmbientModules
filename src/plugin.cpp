@@ -9,4 +9,5 @@ void init(Plugin *p) {
     p->addModel(modelLunarLFO);
     p->addModel(modelLunarVCO);
     p->addModel(modelLunarPapaSrapa);
+    p->addModel(modelLunarSequencer);
 }

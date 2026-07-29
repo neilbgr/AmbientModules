@@ -1,0 +1,270 @@
+#include "plugin.hpp"
+#include "PanelTheme.hpp"
+
+struct LunarSequencer;
+
+// Step CV knobs display plain volts, computed from the module's *current*
+// cvRangeIndex — a plain configParam unit can't do this since the range is
+// picked at runtime from the context menu, not fixed at construction time.
+struct StepCvQuantity : ParamQuantity {
+    std::string getDisplayValueString() override;
+};
+
+// Rack's stock Switch (base of every CKSS*) wraps straight from max back to
+// min on click. A real 3-position toggle can't skip past its middle
+// position like that — it has to pass back through it — so this bounces
+// direction at each end instead of wrapping. Templated on the underlying
+// SvgSwitch so both orientations (vertical/horizontal) share one behavior.
+template <typename TBase>
+struct BounceSwitch : TBase {
+    int direction = 1;
+
+    void onDragStart(const widget::Widget::DragStartEvent& e) override {
+        ParamWidget::onDragStart(e);
+        if (e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+
+        engine::ParamQuantity* pq = this->getParamQuantity();
+        if (!pq) return;
+
+        float oldValue = pq->getValue();
+        float newValue = std::round(oldValue) + direction;
+        if (newValue > pq->getMaxValue() || newValue < pq->getMinValue()) {
+            direction = -direction;
+            newValue = std::round(oldValue) + direction;
+        }
+        pq->setValue(newValue);
+
+        if (oldValue != newValue) {
+            history::ParamChange* h = new history::ParamChange;
+            h->name = "move switch";
+            h->moduleId = this->module->id;
+            h->paramId = this->paramId;
+            h->oldValue = oldValue;
+            h->newValue = newValue;
+            APP->history->push(h);
+        }
+    }
+};
+using BounceCKSSThree = BounceSwitch<CKSSThree>;
+using BounceCKSSThreeHorizontal = BounceSwitch<CKSSThreeHorizontal>;
+
+struct LunarSequencer : Module {
+    static const int NUM_STEPS = 5;
+
+    int theme = 0;
+    int cvRangeIndex = 0; // index into cvRanges
+
+    enum ParamIds {
+        ENUMS(STEP_CV_PARAM, NUM_STEPS),     // 0..1 normalized, rescaled by cvRangeIndex at output time
+        ENUMS(STEP_GATE_PARAM, NUM_STEPS),   // per-step gate on/off
+        STAGES_PARAM,                        // 0/1/2 -> 3/4/5 stages
+        RATE_PARAM,                          // internal pulser rate, in octaves rel. to 1 Hz
+        NUM_PARAMS
+    };
+    enum InputIds {
+        CLOCK_INPUT,
+        //RESET_INPUT,
+        NUM_INPUTS
+    };
+    enum OutputIds {
+        CV_OUTPUT,
+        GATE_OUTPUT,
+        CLOCK_OUTPUT,
+        NUM_OUTPUTS
+    };
+    enum LightIds {
+        ENUMS(STEP_GATE_LIGHT, NUM_STEPS),
+        ENUMS(STEP_LIGHT, NUM_STEPS),
+        NUM_LIGHTS
+    };
+
+    static constexpr float RATE_MIN_OCT = -6.f;
+    static constexpr float RATE_MAX_OCT = 6.f;
+
+    static float octavesToHz(float octaves) {
+        return dsp::approxExp2_taylor5(octaves + 30.f) / std::pow(2.f, 30.f);
+    }
+
+    static constexpr float cvRanges[4][2] = { {0.f, 5.f}, {0.f, 10.f}, {-5.f, 5.f}, {-10.f, 10.f} };
+
+    dsp::SchmittTrigger clockTrigger;
+    dsp::SchmittTrigger resetTrigger;
+    float pulserPhase = 0.f;
+    int stepIndex = 0;
+
+    LunarSequencer() {
+        config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+
+        // Hardware switch is a vertical 3-position toggle reading, top to
+        // bottom: 4, 5, 3 (solar42f_instruct_03_25_v9.pdf, p.11) — not the
+        // intuitive 3/4/5 order. CKSSThree's value 0/1/2 maps to bottom/
+        // middle/top, so the label list below follows that same order.
+        configSwitch(STAGES_PARAM, 0.f, 2.f, 1.f, "Stages", {"3", "5", "4"});
+        configParam(RATE_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, 0.f, "Pulser rate", " Hz", 2.f, 1.f);
+        configInput(CLOCK_INPUT, "Clock In");
+        //configInput(RESET_INPUT, "Reset (back to step 1)");
+        configOutput(CLOCK_OUTPUT, "Clock Out");
+        configOutput(CV_OUTPUT, "Step CV");
+        configOutput(GATE_OUTPUT, "Step gate");
+
+        for (int i = 0; i < NUM_STEPS; i++) {
+            configParam<StepCvQuantity>(STEP_CV_PARAM + i, 0.f, 1.f, 0.f, string::f("Step %d CV", i + 1));
+            configSwitch(STEP_GATE_PARAM + i, 0.f, 1.f, 1.f, string::f("Step %d gate", i + 1), {"Off", "On"});
+        }
+    }
+
+    json_t* dataToJson() override {
+        json_t* rootJ = json_object();
+        json_object_set_new(rootJ, "theme", json_integer(theme));
+        json_object_set_new(rootJ, "cvRangeIndex", json_integer(cvRangeIndex));
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override {
+        json_t* themeJ = json_object_get(rootJ, "theme");
+        if (themeJ) {
+            theme = json_integer_value(themeJ);
+        }
+        json_t* cvRangeJ = json_object_get(rootJ, "cvRangeIndex");
+        if (cvRangeJ) {
+            cvRangeIndex = json_integer_value(cvRangeJ);
+        }
+    }
+
+    void process(const ProcessArgs& args) override {
+        // Same bottom/middle/top -> 3/5/4 mapping as the STAGES_PARAM labels.
+        static const int STAGES_FOR_VALUE[3] = {3, 5, 4};
+        int stagesIdx = clamp((int)std::round(params[STAGES_PARAM].getValue()), 0, 2);
+        int stages = STAGES_FOR_VALUE[stagesIdx];
+
+        float effectiveClockVoltage;
+        if( inputs[CLOCK_INPUT].isConnected())
+        {
+            effectiveClockVoltage = inputs[CLOCK_INPUT].getVoltage();
+        }
+        else
+        {
+            float freq = octavesToHz(params[RATE_PARAM].getValue());
+            pulserPhase += freq * args.sampleTime;
+            if (pulserPhase >= 1.f) pulserPhase -= 1.f;
+            effectiveClockVoltage = (pulserPhase < 0.5f) ? 10.f : 0.f;
+        }
+
+        /*
+        // Low threshold 0.1V (not the default exact 0V): an external clock coming
+        // from a continuously-varying source (e.g. an LFO morphed towards
+        // triangle) asymptotically approaches but essentially never samples at
+        // exactly 0V, so the trigger would latch high forever after the first
+        // edge and never re-arm.
+        if (resetTrigger.process(inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f)) {
+            stepIndex = 0;
+            pulserPhase = 0.f;
+        }
+        */
+        if (clockTrigger.process(effectiveClockVoltage, 0.1f, 1.f)) {
+            stepIndex = (stepIndex + 1) % stages;
+        }
+        if (stepIndex >= stages) stepIndex = 0;
+
+        outputs[CLOCK_OUTPUT].setVoltage(effectiveClockVoltage);
+
+        // According to the documentaiton : "Gates switches does not affect the CV voltage output."
+        float rangeMin = cvRanges[cvRangeIndex][0];
+        float rangeMax = cvRanges[cvRangeIndex][1];
+        float cvNorm = params[STEP_CV_PARAM + stepIndex].getValue();
+        outputs[CV_OUTPUT].setVoltage(rangeMin + cvNorm * (rangeMax - rangeMin));
+
+        bool gateEnabled = params[STEP_GATE_PARAM + stepIndex].getValue() > 0.f;
+        outputs[GATE_OUTPUT].setVoltage(gateEnabled ? effectiveClockVoltage : 0.f);
+
+        for (int i = 0; i < NUM_STEPS; i++) {
+            lights[STEP_GATE_LIGHT + i].setBrightness(params[STEP_GATE_PARAM + i].getValue() > 0.f ? 1.f : 0.f);
+            lights[STEP_LIGHT + i].setBrightness((i < stages && i == stepIndex) ? 1.f : 0.f);
+        }
+    }
+};
+
+constexpr float LunarSequencer::cvRanges[4][2];
+
+std::string StepCvQuantity::getDisplayValueString() {
+    LunarSequencer* m = dynamic_cast<LunarSequencer*>(module);
+    float rangeMin = LunarSequencer::cvRanges[m->cvRangeIndex][0];
+    float rangeMax = LunarSequencer::cvRanges[m->cvRangeIndex][1];
+    float volts = rangeMin + getValue() * (rangeMax - rangeMin);
+    return string::f("%.2fV", volts);
+}
+
+struct LunarSequencerWidget : ModuleWidget, ThemedModuleWidget {
+    int appliedTheme = -1;
+
+    LunarSequencerWidget(LunarSequencer* module) {
+        setModule(module);
+        syncPanelTheme(this, "LunarSequencer", module ? module->theme : 0, appliedTheme);
+
+        addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+
+        const float xL = 10.00f, xC = 18.f, xR = 26.f;
+
+        addParam(createParamCentered<Rogan1PRed>(mm2px(Vec(xC, 20.f)), module, LunarSequencer::RATE_PARAM));
+
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xL, 30.f)), module, LunarSequencer::CLOCK_INPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 30.f)), module, LunarSequencer::CLOCK_OUTPUT));
+
+        //addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xC, 50.f)), module, LunarSequencer::RESET_INPUT));
+
+        addParam(createParamCentered<BounceCKSSThreeHorizontal>(mm2px(Vec(xC, 41.f)), module, LunarSequencer::STAGES_PARAM));
+
+        //const float lightX[LunarSequencer::NUM_STEPS] = {5.36f, 10.30f, 15.24f, 20.18f, 25.12f};           
+
+        const float stepY[LunarSequencer::NUM_STEPS] = {53.f, 65.f, 77.f, 89.f, 101.f};
+        for (int i = 0; i < LunarSequencer::NUM_STEPS; i++) {
+            addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(8.f, stepY[i])), module, LunarSequencer::STEP_GATE_PARAM + i, LunarSequencer::STEP_GATE_LIGHT + i));
+            addParam(createParamCentered<Rogan1PRed>(mm2px(Vec(xC, stepY[i])), module, LunarSequencer::STEP_CV_PARAM + i));
+            addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(28.f, stepY[i])), module, LunarSequencer::STEP_LIGHT + i));
+        }
+
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xL, 113.f)), module, LunarSequencer::GATE_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 113.f)), module, LunarSequencer::CV_OUTPUT));
+    }
+
+    void step() override {
+        if (module) syncPanelTheme(this, "LunarSequencer", dynamic_cast<LunarSequencer*>(module)->theme, appliedTheme);
+        ModuleWidget::step();
+    }
+
+    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
+        LunarSequencer* module = dynamic_cast<LunarSequencer*>(this->module);
+        pushIntFieldChange(module, "change theme", module->theme, theme,
+            [](engine::Module* m, int v) { dynamic_cast<LunarSequencer*>(m)->theme = v; }, complexAction);
+        module->theme = theme;
+        appliedTheme = theme;
+        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarSequencer", theme))));
+    }
+
+    void appendContextMenu(Menu* menu) override {
+        LunarSequencer* module = dynamic_cast<LunarSequencer*>(this->module);
+        assert(module);
+
+        menu->addChild(new MenuSeparator);
+        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
+            [=]() { return module->theme; },
+            [=](int theme) { applyTheme(theme); }
+        ));
+        appendApplyThemeToAllItem(menu, module->theme);
+
+        menu->addChild(createIndexSubmenuItem("CV Range",
+            {"0V to +5V", "0V to +10V", "-5V to +5V", "-10V to +10V"},
+            [=]() { return module->cvRangeIndex; },
+            [=](int index) {
+                pushIntFieldChange(module, "change CV range", module->cvRangeIndex, index,
+                    [](engine::Module* m, int v) { dynamic_cast<LunarSequencer*>(m)->cvRangeIndex = v; });
+                module->cvRangeIndex = index;
+            }
+        ));
+    }
+};
+
+Model* modelLunarSequencer = createModel<LunarSequencer, LunarSequencerWidget>("LunarSequencer");

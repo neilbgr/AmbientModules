@@ -42,6 +42,12 @@
       "name": "LunarPapaSrapa",
       "description": "Noise voice inspired \"Papa Srapa\" drone voice: FM/AM cross-modulated square oscillators, independent white noise, sample & hold, and an Attack/Release envelope with Hold",
       "tags": ["Noise", "Oscillator", "LFO", "Envelope generator"]
+    },
+    {
+      "slug": "LunarSequencer",
+      "name": "LunarSequencer",
+      "description": "5-stage Buchla-inspired sequential voltage source with per-step CV and independent gate on/off, internal pulser or external clock, and a switchable CV output range",
+      "tags": ["Sequencer", "Clock generator"]
     }
   ]
 }

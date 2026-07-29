@@ -10,3 +10,4 @@ extern Model *modelLunar50Drone;
 extern Model *modelLunarLFO;
 extern Model *modelLunarVCO;
 extern Model *modelLunarPapaSrapa;
+extern Model *modelLunarSequencer;
