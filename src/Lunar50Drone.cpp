@@ -9,6 +9,9 @@ struct Lunar50Drone : Module {
 
     int theme = 0;
 
+    enum MixMode { MIX_FIXED = 0, MIX_AVERAGE_ACTIVE = 1, MIX_SOFT_CLIP = 2 };
+    int mixMode = 0; // 0 = Fixed /5 (legacy), keeps existing patches sounding the same
+
     enum ParamIds {
         ENUMS(FREQ_PARAM, NUM_OSC),
         ENUMS(ACTIVE_PARAM, NUM_OSC),
@@ -72,6 +75,7 @@ struct Lunar50Drone : Module {
         json_t* rootJ = json_object();
         json_object_set_new(rootJ, "fmTopology", json_integer(voice[0].fmTopology));
         json_object_set_new(rootJ, "theme", json_integer(theme));
+        json_object_set_new(rootJ, "mixMode", json_integer(mixMode));
         return rootJ;
     }
 
@@ -84,6 +88,10 @@ struct Lunar50Drone : Module {
         json_t* themeJ = json_object_get(rootJ, "theme");
         if (themeJ) {
             theme = json_integer_value(themeJ);
+        }
+        json_t* mixModeJ = json_object_get(rootJ, "mixMode");
+        if (mixModeJ) {
+            mixMode = json_integer_value(mixModeJ);
         }
     }
 
@@ -106,6 +114,11 @@ struct Lunar50Drone : Module {
             lights[MOD_LIGHT + i].setBrightness(mod[i] ? 1.f : 0.f);
 
             pitchParams[i] = params[FREQ_PARAM + i].getValue();
+        }
+
+        int activeCount = 0;
+        for (int i = 0; i < NUM_OSC; i++) {
+            if (active[i]) activeCount++;
         }
 
         // VOLT knob: negative half detunes all 5 oscillators down together;
@@ -142,7 +155,17 @@ struct Lunar50Drone : Module {
             float sawOut = 0.f;
             if (envAmount > 0.f) {
                 float mix = voice[c].process(args.sampleTime, args.sampleRate, pitchParams, active, mod, cv, volt);
-                sawOut = OUTPUT_VOLTAGE * mix / NUM_OSC * envAmount; // average of NUM_OSC oscillators, scaled to OUTPUT_VOLTAGE
+                switch (mixMode) {
+                    case MIX_AVERAGE_ACTIVE:
+                        sawOut = OUTPUT_VOLTAGE * mix / std::max(activeCount, 1) * envAmount;
+                        break;
+                    case MIX_SOFT_CLIP:
+                        sawOut = OUTPUT_VOLTAGE * std::tanh(mix) * envAmount;
+                        break;
+                    default: // MIX_FIXED
+                        sawOut = OUTPUT_VOLTAGE * mix / NUM_OSC * envAmount; // average of NUM_OSC oscillators, scaled to OUTPUT_VOLTAGE
+                        break;
+                }
             }
 
             outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
@@ -225,6 +248,15 @@ struct Lunar50DroneWidget : ModuleWidget, ThemedModuleWidget {
                         for (int c = 0; c < PORT_MAX_CHANNELS; c++) mm->voice[c].fmTopology = v;
                     });
                 for (int c = 0; c < PORT_MAX_CHANNELS; c++) module->voice[c].fmTopology = topology;
+            }
+        ));
+        menu->addChild(createIndexSubmenuItem("Oscillator mix",
+            {"Fixed sum / 5 (legacy)", "Average of active oscillators", "Soft-clip saturated sum"},
+            [=]() { return module->mixMode; },
+            [=](int mode) {
+                pushIntFieldChange(module, "change oscillator mix", module->mixMode, mode,
+                    [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->mixMode = v; });
+                module->mixMode = mode;
             }
         ));
     }
