@@ -1,21 +1,8 @@
 #pragma once
 #include <rack.hpp>
+#include "PolyBlep.hpp"
 
 using namespace rack;
-
-// Classic 2-piece PolyBLEP correction (Valimaki/Huovilainen-style), applied
-// near a waveform's hard discontinuity (t = phase distance from the edge,
-// dt = phase increment per sample) to band-limit it without oversampling.
-static inline float polyBlep(float t, float dt) {
-    if (t < dt) {
-        t /= dt;
-        return t + t - t * t - 1.f;
-    } else if (t > 1.f - dt) {
-        t = (t - 1.f) / dt;
-        return t * t + t + t + 1.f;
-    }
-    return 0.f;
-}
 
 // One "AS3340-style" VCO voice: 6 discrete waveforms (4 fixed + 2 morphing),
 // tune/octave/sub, lin or exp secondary FM input, hard sync. Pure DSP, no
