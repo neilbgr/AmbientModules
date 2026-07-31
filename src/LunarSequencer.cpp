@@ -78,7 +78,7 @@ struct LunarSequencer : Module {
         NUM_LIGHTS
     };
 
-    static constexpr float RATE_MIN_OCT = -6.f;
+    static constexpr float RATE_MIN_OCT = -4.3219f; // 0.05 Hz (20 s/step)
     static constexpr float RATE_MAX_OCT = 6.f;
 
     static float octavesToHz(float octaves) {
@@ -100,7 +100,7 @@ struct LunarSequencer : Module {
         // intuitive 3/4/5 order. CKSSThree's value 0/1/2 maps to bottom/
         // middle/top, so the label list below follows that same order.
         configSwitch(STAGES_PARAM, 0.f, 2.f, 1.f, "Stages", {"3", "5", "4"});
-        configParam(RATE_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, 0.f, "Pulser rate", " Hz", 2.f, 1.f);
+        configParam(RATE_PARAM, RATE_MIN_OCT, RATE_MAX_OCT, 1.f, "Pulser rate", " Hz", 2.f, 1.f);
         configInput(CLOCK_INPUT, "Clock In");
         //configInput(RESET_INPUT, "Reset (back to step 1)");
         configOutput(CLOCK_OUTPUT, "Clock Out");
