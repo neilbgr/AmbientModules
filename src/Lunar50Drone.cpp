@@ -40,6 +40,7 @@ struct Lunar50Drone : Module {
         ENUMS(ACTIVE_LIGHT, NUM_OSC),
         ENUMS(MOD_LIGHT, NUM_OSC),
         HOLD_LIGHT,
+        ENV_LIGHT,
         NUM_LIGHTS
     };
 
@@ -130,6 +131,7 @@ struct Lunar50Drone : Module {
         float attack = params[ATTACK_PARAM].getValue();
         float release = params[RELEASE_PARAM].getValue();
         bool envInputConnected = inputs[ENV_INPUT].isConnected();
+        bool gateInputConnected = inputs[GATE_INPUT].isConnected();
         float atten = params[ATTEN_PARAM].getValue();
 
         float maxEnvValue = 0.f;
@@ -138,13 +140,16 @@ struct Lunar50Drone : Module {
             // all 5 frequencies together while preserving the intervals between them.
             float cv = inputs[CV_INPUT].getPolyVoltage(c) * atten;
 
-            gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
-            bool gateHigh = gateTrigger[c].isHigh() || holdActive;
-
             float envValue;
             if (envInputConnected) {
                 envValue = inputs[ENV_INPUT].getPolyVoltage(c) / 10.f;
             } else {
+                gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
+                // Priority: ENV input > Gate input > Hold button — once a gate
+                // is patched in, it fully takes over and Hold no longer forces
+                // the envelope open behind its back.
+                bool gateHigh = gateInputConnected ? gateTrigger[c].isHigh() : holdActive;
+
                 envelope[c].updateCoefficients(attack, release);
                 envValue = envelope[c].process(args.sampleTime, gateHigh);
             }
@@ -174,7 +179,8 @@ struct Lunar50Drone : Module {
         outputs[ENV_OUTPUT].setChannels(channels);
         outputs[SAW_OUTPUT].setChannels(channels);
 
-        lights[HOLD_LIGHT].setBrightness(maxEnvValue);
+        lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
+        lights[ENV_LIGHT].setBrightness(maxEnvValue);
     }
 };
 
@@ -211,7 +217,8 @@ struct Lunar50DroneWidget : ModuleWidget, ThemedModuleWidget {
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 98.f)), module, Lunar50Drone::ENV_OUTPUT));
 
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 113.f)), module, Lunar50Drone::GATE_INPUT));
-        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(24.f, 113.f)), module, Lunar50Drone::HOLD_PARAM, Lunar50Drone::HOLD_LIGHT));        
+        addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(18.5f, 113.f - 2.f )), module, Lunar50Drone::ENV_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(24.f, 113.f)), module, Lunar50Drone::HOLD_PARAM, Lunar50Drone::HOLD_LIGHT));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 113.f)), module, Lunar50Drone::SAW_OUTPUT));
     }
 

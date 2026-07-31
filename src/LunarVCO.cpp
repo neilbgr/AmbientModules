@@ -42,6 +42,7 @@ struct LunarVCO : Module {
         SUB_LIGHT,
         LINEXP_LIGHT,
         HOLD_LIGHT,
+        ENV_LIGHT,
         SELFGEN_LIGHT,
         NUM_LIGHTS
     };
@@ -109,6 +110,7 @@ struct LunarVCO : Module {
         float sustain = params[SUSTAIN_PARAM].getValue();
         float release = params[RELEASE_PARAM].getValue();
         bool envInputConnected = inputs[ENV_INPUT].isConnected();
+        bool gateInputConnected = inputs[GATE_INPUT].isConnected();
 
         float maxEnvValue = 0.f;
         for (int c = 0; c < channels; c++) {
@@ -129,7 +131,11 @@ struct LunarVCO : Module {
                 envValue = clamp(inputs[ENV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
             } else {
                 bool gate = inputs[GATE_INPUT].getPolyVoltage(c) >= 1.f;
-                envValue = env[c].process(args.sampleTime, gate, selfGen, hold, attack, decay, sustain, release);
+                // Priority: ENV input > Gate input > Hold button — once a gate
+                // is patched in, it fully takes over and Hold no longer forces
+                // the envelope open behind its back.
+                bool effectiveHold = gateInputConnected ? false : hold;
+                envValue = env[c].process(args.sampleTime, gate, selfGen, effectiveHold, attack, decay, sustain, release);
             }
             maxEnvValue = std::max(maxEnvValue, envValue);
 
@@ -142,7 +148,8 @@ struct LunarVCO : Module {
         lights[OCTAVE_LIGHT].setBrightness(octaveOn ? 1.f : 0.f);
         lights[SUB_LIGHT].setBrightness(subOscOn ? 1.f : 0.f);
         lights[LINEXP_LIGHT].setBrightness(expMode ? 1.f : 0.f);
-        lights[HOLD_LIGHT].setBrightness(maxEnvValue);
+        lights[HOLD_LIGHT].setBrightness(hold ? 1.f : 0.f);
+        lights[ENV_LIGHT].setBrightness(maxEnvValue);
         lights[SELFGEN_LIGHT].setBrightness(selfGen ? 1.f : 0.f);
     }
 };
@@ -207,7 +214,8 @@ struct LunarVCOWidget : ModuleWidget, ThemedModuleWidget {
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x3div3, pnl3_y2)), module, LunarVCO::ENV_OUTPUT));
 
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div3, pnl3_y3)), module, LunarVCO::GATE_INPUT));
-        addParam(createLightParamCentered<VCVLightBezelLatch<YellowLight>>(mm2px(Vec(x2div3, pnl3_y3)), module, LunarVCO::HOLD_PARAM, LunarVCO::HOLD_LIGHT));
+        addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(x2div3 - 5.5f, pnl3_y3 - 2.f)), module, LunarVCO::ENV_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2div3, pnl3_y3)), module, LunarVCO::HOLD_PARAM, LunarVCO::HOLD_LIGHT));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x3div3, pnl3_y3)), module, LunarVCO::VCO_OUTPUT));
     }
 
