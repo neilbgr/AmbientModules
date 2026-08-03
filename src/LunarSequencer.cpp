@@ -215,7 +215,7 @@ struct LunarSequencerWidget : ModuleWidget, ThemedModuleWidget {
 
         //addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xC, 50.f)), module, LunarSequencer::RESET_INPUT));
 
-        addParam(createParamCentered<BounceCKSSThreeHorizontal>(mm2px(Vec(xC, 41.f)), module, LunarSequencer::STAGES_PARAM));
+        addParam(createParamCentered<BounceCKSSThreeHorizontal>(mm2px(Vec(xC, 44.5f)), module, LunarSequencer::STAGES_PARAM));
 
         //const float lightX[LunarSequencer::NUM_STEPS] = {5.36f, 10.30f, 15.24f, 20.18f, 25.12f};           
 
