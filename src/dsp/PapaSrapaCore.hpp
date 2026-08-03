@@ -1,6 +1,5 @@
 #pragma once
 #include <rack.hpp>
-#include "PolyBlep.hpp"
 
 using namespace rack;
 
@@ -16,9 +15,50 @@ struct PapaSrapaCore {
 
     float modPhase = 0.f;
     float audioPhase = 0.f;
+    float modFast = 0.f, modSlow = 0.f, modSmooth = 0.f;
+    float audioFast = 0.f, audioSlow = 0.f, audioSmooth = 0.f;
     uint32_t noiseState = 0x1234567u; // xorshift32 state, must stay non-zero
     float noise = 0.f; // last white-noise sample in [-1, 1], tapped by the S&H
     float lfoOut = 0.f; // last modulator square sample in [-1, 1], tapped by LFO_OUTPUT
+
+    // The real hardware's square oscillators don't hold a flat rail: each half
+    // cycle is a decelerating RC-style ramp that only reaches a fraction of
+    // full swing before the (relatively fast, but not instant) flip. Measured
+    // off a captured real-hardware period (wave/PapaSrapaSquare.wav): the flip
+    // itself takes ~3-4 samples at 48kHz (~70us) while the sustained ramp for
+    // the rest of the half-cycle is ~40x slower — one time constant can't fit
+    // both, hence the fast+slow blend below. RAMP_SLOW_TAU_PERIODS is in
+    // multiples of the oscillator's own period (not a fixed time), so the
+    // reached fraction per half-cycle — and the risk of smearing the
+    // fundamental at high audio pitch — stays constant across the whole
+    // pitch range. Values below are a starting point tuned by ear against
+    // that recording, matching this file's existing "idiomatic approximation"
+    // philosophy (see struct comment above).
+    static constexpr float RAMP_FAST_TAU = 0.00007f;     // ~70us: fast flip
+    static constexpr float RAMP_SLOW_TAU_PERIODS = 1.5f; // sustained ramp, in periods
+    static constexpr float RAMP_MIX = 0.3f;              // weight of the fast component
+    static constexpr float RAMP_MAKEUP_GAIN = 2.f;       // restores ~unity peak swing
+    // fast and slow each individually curve smoothly, but their common target
+    // still flips instantly, so the blended sum still has a sharp corner (a
+    // discontinuous slope) right at each flip. A short extra lowpass stage
+    // here stands in for the finite bandwidth any real output/buffer stage
+    // would have, rounding that corner off — physically motivated, not just
+    // decorative — without blunting the fast component's speed (its tau is
+    // well under RAMP_FAST_TAU, so it only softens the kink itself).
+    static constexpr float RAMP_SMOOTH_TAU = 0.00002f; // ~20us
+
+    static float shapeRampedSquare(float& fast, float& slow, float& smooth, float phase, float freq, float sampleTime) {
+        float target = (phase < 0.5f) ? 1.f : -1.f;
+        fast += (target - fast) * (1.f - std::exp(-sampleTime / RAMP_FAST_TAU));
+
+        float period = 1.f / std::max(freq, 1e-6f);
+        float slowTau = RAMP_SLOW_TAU_PERIODS * period;
+        slow += (target - slow) * (1.f - std::exp(-sampleTime / slowTau));
+
+        float blended = clamp((RAMP_MIX * fast + (1.f - RAMP_MIX) * slow) * RAMP_MAKEUP_GAIN, -1.f, 1.f);
+        smooth += (blended - smooth) * (1.f - std::exp(-sampleTime / RAMP_SMOOTH_TAU));
+        return smooth;
+    }
 
     static float nextNoise(uint32_t& state) {
         // xorshift32: cheap, good enough for audio-rate white noise, no runtime pow/trig.
@@ -51,13 +91,7 @@ struct PapaSrapaCore {
 
         modPhase += modFreq * sampleTime;
         modPhase -= std::floor(modPhase);
-        float modDt = modFreq * sampleTime;
-        // PolyBLEP-soften both edges: the real hardware's Schmitt-trigger
-        // oscillators don't switch instantaneously, so a perfectly hard
-        // square reads as harsher than the original.
-        float modSquare = (modPhase < 0.5f) ? 1.f : -1.f;
-        modSquare += polyBlep(modPhase, modDt);
-        modSquare -= polyBlep(std::fmod(modPhase - 0.5f + 1.f, 1.f), modDt);
+        float modSquare = shapeRampedSquare(modFast, modSlow, modSmooth, modPhase, modFreq, sampleTime);
         lfoOut = modSquare;
 
         noise = nextNoise(noiseState);
@@ -73,10 +107,7 @@ struct PapaSrapaCore {
 
         audioPhase += audioFreq * sampleTime;
         audioPhase -= std::floor(audioPhase);
-        float audioDt = audioFreq * sampleTime;
-        float audioSquare = (audioPhase < 0.5f) ? 1.f : -1.f;
-        audioSquare += polyBlep(audioPhase, audioDt);
-        audioSquare -= polyBlep(std::fmod(audioPhase - 0.5f + 1.f, 1.f), audioDt);
+        float audioSquare = shapeRampedSquare(audioFast, audioSlow, audioSmooth, audioPhase, audioFreq, sampleTime);
 
         float amGain = amOn ? (0.5f + 0.5f * modDepth * modSquare) : 1.f;
         float out = audioSquare * amGain;
