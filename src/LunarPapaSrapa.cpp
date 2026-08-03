@@ -78,6 +78,7 @@ struct LunarPapaSrapa : Module {
         NOISE_ONLY_LIGHT,
         FM_LIGHT,
         AM_LIGHT,
+        SH_LIGHT,
         NUM_LIGHTS
     };
 
@@ -158,6 +159,7 @@ struct LunarPapaSrapa : Module {
         int channels = std::max(std::max(inputs[PITCH_CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), 1);
 
         float maxEnvValue = 0.f;
+        float maxShAbs = 0.f;
         for (int c = 0; c < channels; c++) {
             float pitchOctaves = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getPolyVoltage(c);
             float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
@@ -175,6 +177,7 @@ struct LunarPapaSrapa : Module {
             if (clockTrigger[c].process(inputs[SH_CLOCK_INPUT].getPolyVoltage(c))) {
                 shValue[c] = inputs[SH_INPUT].isConnected() ? inputs[SH_INPUT].getPolyVoltage(c) / OUTPUT_VOLTAGE : core[c].noise;
             }
+            maxShAbs = std::max(maxShAbs, std::fabs(shValue[c]));
             outputs[SH_OUTPUT].setVoltage(shValue[c] * OUTPUT_VOLTAGE, c);
             outputs[LFO_OUTPUT].setVoltage(core[c].lfoOut * OUTPUT_VOLTAGE, c);
 
@@ -202,6 +205,7 @@ struct LunarPapaSrapa : Module {
 
         lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
         lights[ENV_LIGHT].setBrightness(maxEnvValue);
+        lights[SH_LIGHT].setBrightness(clamp(maxShAbs, 0.f, 1.f));
     }
 };
 
@@ -239,6 +243,8 @@ struct LunarPapaSrapaWidget : ModuleWidget, ThemedModuleWidget {
 
         addParam(createParamCentered<Rogan1PBlue>(mm2px(Vec(x3_5, 55.25f)), module, LunarPapaSrapa::NOISE_PARAM));
         addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x3_5, 67.f)), module, LunarPapaSrapa::NOISE_ONLY_PARAM, LunarPapaSrapa::NOISE_ONLY_LIGHT));
+
+        addChild(createLightCentered<MediumLight<BlueLight>>(mm2px(Vec(50.f, 63.5f)), module, LunarPapaSrapa::SH_LIGHT));
 
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1_5, 82.5f)), module, LunarPapaSrapa::SH_INPUT));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x3_5, 82.5f)), module, LunarPapaSrapa::SH_CLOCK_INPUT));
