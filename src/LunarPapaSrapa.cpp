@@ -197,8 +197,10 @@ struct LunarPapaSrapaWidget : ModuleWidget, ThemedModuleWidget {
         float W = 52.318f;
         float C = 55.88f / 2.f;
         float W_6 = W / 6.f;
+        
         float x1_5 = C - 2.f * W_6, x2_5 = C - W_6, x3_5 = C, x4_5 = C + W_6, x5_5 = C + 2.f * W_6;
-        float x1_4 = 12.f, x2_4 = 30.f, x3_4 = 48.f;
+
+        float x1_4 = x1_5, x2_4 = x1_5 + ((x5_5 - x1_5) / 3.f), x3_4 = x1_5 + ((x5_5 - x1_5) * 2.f / 3.f), x4_4 = x5_5;
 
         addParam(createParamCentered<Rogan1PBlue>(mm2px(Vec(x1_5, 24.f)), module, LunarPapaSrapa::RATE_PARAM));
         addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2_5, 30.f)), module, LunarPapaSrapa::FM_PARAM, LunarPapaSrapa::FM_LIGHT));
@@ -213,19 +215,19 @@ struct LunarPapaSrapaWidget : ModuleWidget, ThemedModuleWidget {
         addParam(createParamCentered<Rogan1PBlue>(mm2px(Vec(x3_5, 55.25f)), module, LunarPapaSrapa::NOISE_PARAM));
         addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x3_5, 67.f)), module, LunarPapaSrapa::NOISE_ONLY_PARAM, LunarPapaSrapa::NOISE_ONLY_LIGHT));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 82.5f)), module, LunarPapaSrapa::SH_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.f, 82.5f)), module, LunarPapaSrapa::SH_CLOCK_INPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 82.5f)), module, LunarPapaSrapa::SH_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1_5, 82.5f)), module, LunarPapaSrapa::SH_INPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x3_5, 82.5f)), module, LunarPapaSrapa::SH_CLOCK_INPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x5_5, 82.5f)), module, LunarPapaSrapa::SH_OUTPUT));
         
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 98.f)), module, LunarPapaSrapa::ENV_INPUT));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(24.f, 98.f)), module, LunarPapaSrapa::ATTACK_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(36.f, 98.f)), module, LunarPapaSrapa::RELEASE_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 98.f)), module, LunarPapaSrapa::ENV_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1_4, 98.f)), module, LunarPapaSrapa::ENV_INPUT));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x2_4, 98.f)), module, LunarPapaSrapa::ATTACK_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x3_4, 98.f)), module, LunarPapaSrapa::RELEASE_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x4_4, 98.f)), module, LunarPapaSrapa::ENV_OUTPUT));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(12.f, 113.f)), module, LunarPapaSrapa::GATE_INPUT));
-        addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(18.5f, 113.f - 2.f )), module, LunarPapaSrapa::ENV_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(24.f, 113.f)), module, LunarPapaSrapa::HOLD_PARAM, LunarPapaSrapa::HOLD_LIGHT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(48.f, 113.f)), module, LunarPapaSrapa::VCO_OUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1_4, 113.f)), module, LunarPapaSrapa::GATE_INPUT));
+        addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(x2_4 - 5.5f, 113.f - 2.f )), module, LunarPapaSrapa::ENV_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2_4, 113.f)), module, LunarPapaSrapa::HOLD_PARAM, LunarPapaSrapa::HOLD_LIGHT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x4_4, 113.f)), module, LunarPapaSrapa::VCO_OUT));
 
     }
 
