@@ -11,9 +11,11 @@ struct LunarVCOCore {
     enum Waveform {
         WAVE_SINE, WAVE_TRIANGLE, WAVE_INV_SAW, WAVE_SQUARE,
         WAVE_SAW_MORPH,       // shape = blend saw..inverted saw
-        WAVE_SINE_TRI_MORPH,  // shape = blend sine..triangle
+        WAVE_SINE_SAW_MORPH,  // shape = blend sine..saw (phase-offset, see SINE_SAW_PHASE_OFFSET)
         NUM_WAVEFORMS
     };
+
+    static constexpr float SINE_SAW_PHASE_OFFSET = 0.33333f; // a third of a period; tuned by ear against hardware
 
     float phase = 0.f;
     float subPhase = 0.f;
@@ -63,13 +65,17 @@ struct LunarVCOCore {
                 // Ramp resets (falls back to +1) at phase == 0 — PolyBLEP-correct that edge.
                 out = -saw + polyBlep(phase, dt);
                 break;
-            case WAVE_SQUARE:
+            case WAVE_SQUARE: {
                 // shape = pulse width here; two hard edges per cycle (rise at
-                // phase == 0, fall at phase == shape) — correct both.
-                out = (phase < shape) ? 1.f : -1.f;
+                // phase == 0, fall at phase == duty) — correct both. Clamp
+                // away from 0/1: at the extremes the duty cycle degenerates
+                // to permanent silence (or DC), i.e. no pulse at all.
+                float duty = clamp(shape, 0.02f, 0.98f);
+                out = (phase < duty) ? 1.f : -1.f;
                 out += polyBlep(phase, dt);
-                out -= polyBlep(std::fmod(phase - shape + 1.f, 1.f), dt);
+                out -= polyBlep(std::fmod(phase - duty + 1.f, 1.f), dt);
                 break;
+            }
             case WAVE_SAW_MORPH: {
                 // shape 0 = rising saw, 0.5 = symmetric triangle, 1 = falling
                 // ramp (inverted saw): move the single peak's position across
@@ -81,16 +87,18 @@ struct LunarVCOCore {
                                     : (1.f - 2.f * (phase - bp) / (1.f - bp));
                 break;
             }
-            case WAVE_SINE_TRI_MORPH: {
-                // Reshape the sine into a triangle via an arcsine waveshaper
-                // instead of crossfading two independent waveforms: at the
-                // phase where sine hits +-1, asin(k*sine)/asin(k) also hits
-                // exactly +-1 for any k, so peak-to-peak stays at 2 through
-                // the whole morph. k=1 reduces exactly to the classic
-                // triangle-from-sine identity (2/pi)*asin(sin(x)).
+            case WAVE_SINE_SAW_MORPH: {
+                // Real hardware crossfades a sine core and a sawtooth core
+                // that run out of phase with each other, not in-phase — an
+                // in-phase linear mix of saw with its own inverse (same trick
+                // WAVE_SAW_MORPH avoids above) would partially cancel toward
+                // a flat line around shape=0.5; the phase offset is what
+                // makes a genuinely linear blend viable here.
+                float sawPhase = phase + SINE_SAW_PHASE_OFFSET;
+                sawPhase -= std::floor(sawPhase);
                 float sine = std::sin(2.f * M_PI * phase);
-                float k = clamp(shape, 0.f, 0.999f);
-                out = (k < 1e-3f) ? sine : (std::asin(k * sine) / std::asin(k));
+                float sawOffset = 2.f * sawPhase - 1.f;
+                out = (1.f - shape) * sine + shape * sawOffset;
                 break;
             }
             default:

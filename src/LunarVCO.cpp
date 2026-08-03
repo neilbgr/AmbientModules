@@ -54,7 +54,7 @@ struct LunarVCO : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
         configSwitch(WAVEFORM_PARAM, 0.f, 5.f, 0.f, "Waveform",
-            {"Sine", "Triangle", "Inverted saw", "Square", "Saw to inv. saw (shape = blend)", "Sine to triangle (shape = blend)"});
+            {"Sine", "Triangle", "Inverted saw", "Square", "Saw to inv. saw (shape = blend)", "Sine to saw (shape = blend)"});
         configParam(TUNE_PARAM, -0.5f, 0.5f, 0.f, "Tune (1 octave range)");
         configSwitch(OCTAVE_PARAM, 0.f, 1.f, 0.f, "Octave", {"Low", "+3"});
         configSwitch(SUB_PARAM, 0.f, 1.f, 0.f, "Sub oscillator", {"Off", "On (-1 octave)"});
