@@ -81,11 +81,11 @@ struct LunarPapaSrapa : Module {
         NUM_LIGHTS
     };
 
-    PapaSrapaCore core;
-    AREnvelope envelope;
-    dsp::SchmittTrigger gateTrigger;
-    dsp::SchmittTrigger clockTrigger;
-    float shValue = 0.f;
+    PapaSrapaCore core[PORT_MAX_CHANNELS];
+    AREnvelope envelope[PORT_MAX_CHANNELS];
+    dsp::SchmittTrigger gateTrigger[PORT_MAX_CHANNELS];
+    dsp::SchmittTrigger clockTrigger[PORT_MAX_CHANNELS];
+    float shValue[PORT_MAX_CHANNELS] = {};
 
     LunarPapaSrapa() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -136,7 +136,6 @@ struct LunarPapaSrapa : Module {
 
     void process(const ProcessArgs& args) override {
         float rateOctaves = RATE_MIN_OCT + (RATE_MAX_OCT - RATE_MIN_OCT) * std::pow(params[RATE_PARAM].getValue(), RATE_CURVE_EXP);
-        float pitchOctaves = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getVoltage();
 
         bool fm = params[FM_PARAM].getValue() > 0.f;
         bool am = params[AM_PARAM].getValue() > 0.f;
@@ -150,42 +149,59 @@ struct LunarPapaSrapa : Module {
         bool noiseOnly = params[NOISE_ONLY_PARAM].getValue() > 0.f;
         lights[NOISE_ONLY_LIGHT].setBrightness(noiseOnly ? 1.f : 0.f);
 
-        // Unlike Lunar50Drone's oscillator bank, this core is already cheap
-        // (2 square oscillators + a noise sample, no sin/asin) and the noise
-        // sample must stay continuously fresh for the S&H below even when
-        // the envelope is at 0 (silent gate) — so it always runs, matching
-        // LunarVCO's approach rather than Lunar50Drone's envelope-gated skip.
-        float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
-        float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
-
-        float vco = core.process(args.sampleTime, args.sampleRate, rateOctaves,
-            dividerAmount, pitchOctaves, modAmount,
-            mode, params[NOISE_PARAM].getValue(), noiseOnly);
-
-        if (clockTrigger.process(inputs[SH_CLOCK_INPUT].getVoltage())) {
-            shValue = inputs[SH_INPUT].isConnected() ? inputs[SH_INPUT].getVoltage() / OUTPUT_VOLTAGE : core.noise;
-        }
-        outputs[SH_OUTPUT].setVoltage(shValue * OUTPUT_VOLTAGE);
-        outputs[LFO_OUTPUT].setVoltage(core.lfoOut * OUTPUT_VOLTAGE);
-
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
         bool envInputConnected = inputs[ENV_INPUT].isConnected();
-        float envValue;
-        if (envInputConnected) {
-            envValue = inputs[ENV_INPUT].getVoltage() / 10.f;
-        } else {
-            gateTrigger.process(inputs[GATE_INPUT].getVoltage());
-            bool gateHigh = inputs[GATE_INPUT].isConnected() ? gateTrigger.isHigh() : holdActive;
-            envelope.updateCoefficients(params[ATTACK_PARAM].getValue(), params[RELEASE_PARAM].getValue());
-            envValue = envelope.process(args.sampleTime, gateHigh);
+        bool gateInputConnected = inputs[GATE_INPUT].isConnected();
+        float attack = params[ATTACK_PARAM].getValue();
+        float release = params[RELEASE_PARAM].getValue();
+
+        int channels = std::max(std::max(inputs[PITCH_CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), 1);
+
+        float maxEnvValue = 0.f;
+        for (int c = 0; c < channels; c++) {
+            float pitchOctaves = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getPolyVoltage(c);
+            float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
+            float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
+
+            // Unlike Lunar50Drone's oscillator bank, this core is already cheap
+            // (2 square oscillators + a noise sample, no sin/asin) and the noise
+            // sample must stay continuously fresh for the S&H below even when
+            // the envelope is at 0 (silent gate) — so it always runs, matching
+            // LunarVCO's approach rather than Lunar50Drone's envelope-gated skip.
+            float vco = core[c].process(args.sampleTime, args.sampleRate, rateOctaves,
+                dividerAmount, pitchOctaves, modAmount,
+                mode, params[NOISE_PARAM].getValue(), noiseOnly);
+
+            if (clockTrigger[c].process(inputs[SH_CLOCK_INPUT].getPolyVoltage(c))) {
+                shValue[c] = inputs[SH_INPUT].isConnected() ? inputs[SH_INPUT].getPolyVoltage(c) / OUTPUT_VOLTAGE : core[c].noise;
+            }
+            outputs[SH_OUTPUT].setVoltage(shValue[c] * OUTPUT_VOLTAGE, c);
+            outputs[LFO_OUTPUT].setVoltage(core[c].lfoOut * OUTPUT_VOLTAGE, c);
+
+            float envValue;
+            if (envInputConnected) {
+                envValue = inputs[ENV_INPUT].getPolyVoltage(c) / 10.f;
+            } else {
+                gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
+                bool gateHigh = gateInputConnected ? gateTrigger[c].isHigh() : holdActive;
+                envelope[c].updateCoefficients(attack, release);
+                envValue = envelope[c].process(args.sampleTime, gateHigh);
+            }
+
+            float envAmount = clamp(envValue, 0.f, 1.f);
+            maxEnvValue = std::max(maxEnvValue, envAmount);
+
+            outputs[VCO_OUT].setVoltage(vco * OUTPUT_VOLTAGE * envAmount, c);
+            outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
         }
 
-        float envAmount = clamp(envValue, 0.f, 1.f);
-        lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
-        lights[ENV_LIGHT].setBrightness(envAmount);
+        outputs[LFO_OUTPUT].setChannels(channels);
+        outputs[VCO_OUT].setChannels(channels);
+        outputs[ENV_OUTPUT].setChannels(channels);
+        outputs[SH_OUTPUT].setChannels(channels);
 
-        outputs[VCO_OUT].setVoltage(vco * OUTPUT_VOLTAGE * envAmount);
-        outputs[ENV_OUTPUT].setVoltage(envValue * 10.f);
+        lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
+        lights[ENV_LIGHT].setBrightness(maxEnvValue);
     }
 };
 

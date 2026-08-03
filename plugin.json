@@ -41,7 +41,7 @@
       "slug": "LunarPapaSrapa",
       "name": "LunarPapaSrapa",
       "description": "Noise voice inspired \"Papa Srapa\" drone voice: FM/AM cross-modulated square oscillators, independent white noise, sample & hold, and an Attack/Release envelope with Hold",
-      "tags": ["Noise", "Oscillator", "LFO", "Envelope generator"]
+      "tags": ["Noise", "Oscillator", "LFO", "Envelope generator", "Polyphonic"]
     },
     {
       "slug": "LunarSequencer",
