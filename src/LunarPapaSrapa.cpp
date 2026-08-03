@@ -61,6 +61,8 @@ struct LunarPapaSrapa : Module {
         SH_CLOCK_INPUT,
         SH_INPUT,           // sample & hold source, normalled to the internal noise
         ENV_INPUT,
+        MOD_CV_INPUT,       // sums onto MOD_PARAM
+        DIVIDER_CV_INPUT,   // sums onto DIVIDER_PARAM
         NUM_INPUTS
     };
     enum OutputIds {
@@ -98,7 +100,9 @@ struct LunarPapaSrapa : Module {
         configSwitch(FM_PARAM, 0.f, 1.f, 0.f, "FM", {"Off", "On"});
         configSwitch(AM_PARAM, 0.f, 1.f, 0.f, "AM", {"Off", "On"});
         configParam(MOD_PARAM, 0.f, 1.f, 0.5f, "Modulation depth", "%", 0.f, 100.f);
+        configInput(MOD_CV_INPUT, "Modulation depth CV");
         configParam(DIVIDER_PARAM, 0.f, 1.f, 0.f, "Divider", "%", 0.f, 100.f);
+        configInput(DIVIDER_CV_INPUT, "Divider CV");
         configParam(NOISE_PARAM, 0.f, 1.f, 0.f, "Noise", "%", 0.f, 100.f);
         configSwitch(NOISE_ONLY_PARAM, 0.f, 1.f, 0.f, "Noise only", {"Off", "On"});
 
@@ -151,8 +155,11 @@ struct LunarPapaSrapa : Module {
         // sample must stay continuously fresh for the S&H below even when
         // the envelope is at 0 (silent gate) — so it always runs, matching
         // LunarVCO's approach rather than Lunar50Drone's envelope-gated skip.
+        float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+        float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+
         float vco = core.process(args.sampleTime, args.sampleRate, rateOctaves,
-            params[DIVIDER_PARAM].getValue(), pitchOctaves, params[MOD_PARAM].getValue(),
+            dividerAmount, pitchOctaves, modAmount,
             mode, params[NOISE_PARAM].getValue(), noiseOnly);
 
         if (clockTrigger.process(inputs[SH_CLOCK_INPUT].getVoltage())) {
@@ -208,6 +215,8 @@ struct LunarPapaSrapaWidget : ModuleWidget, ThemedModuleWidget {
         addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x4_5, 30.f)), module, LunarPapaSrapa::AM_PARAM, LunarPapaSrapa::AM_LIGHT));
         addParam(createParamCentered<Rogan1PBlue>(mm2px(Vec(x5_5, 24.f)), module, LunarPapaSrapa::DIVIDER_PARAM));        
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x1_5, 38.f)), module, LunarPapaSrapa::LFO_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x3_5, 38.f)), module, LunarPapaSrapa::MOD_CV_INPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x5_5, 38.f)), module, LunarPapaSrapa::DIVIDER_CV_INPUT));
         
         addParam(createParamCentered<Rogan1PBlue>(mm2px(Vec(x1_5, 55.25f)), module, LunarPapaSrapa::PITCH_PARAM));
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1_5, 67.f)), module, LunarPapaSrapa::PITCH_CV_INPUT));
