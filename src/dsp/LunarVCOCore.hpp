@@ -17,8 +17,31 @@ struct LunarVCOCore {
 
     static constexpr float SINE_SAW_PHASE_OFFSET = 0.33333f; // a third of a period; tuned by ear against hardware
 
+    // A real chip VCO (this one styled after the AS3340) has finite output
+    // bandwidth: edges/corners are rounded, but — unlike PapaSrapaCore's
+    // sloppier relaxation oscillator — it still reaches full swing quickly,
+    // so a single short lowpass (tau relative to the current period, so the
+    // amount of rounding stays proportionally the same across the whole
+    // pitch range) is enough for that character. This does NOT band-limit
+    // the hard edges on its own at high pitch (tau shrinks right along with
+    // the period) — PolyBLEP below is still what keeps square/inv-saw from
+    // aliasing into harsh top-end harmonics on high notes; this pass is
+    // layered on top of the BLEP-corrected signal, not instead of it. No
+    // hardware capture to calibrate against here — starting point, tune by
+    // ear.
+    static constexpr float EDGE_SMOOTH_TAU_PERIODS = 0.01f; // ~1% of period
+
+    static float smoothEdge(float& state, float value, float freq, float sampleTime) {
+        float period = 1.f / std::max(freq, 1e-6f);
+        float tau = EDGE_SMOOTH_TAU_PERIODS * period;
+        state += (value - state) * (1.f - std::exp(-sampleTime / tau));
+        return state;
+    }
+
     float phase = 0.f;
     float subPhase = 0.f;
+    float cornerSmooth = 0.f;
+    float subSmooth = 0.f;
     dsp::SchmittTrigger syncTrigger;
 
     // pitchOctaves: tune + 1V/oct input, already summed by the caller.
@@ -62,14 +85,19 @@ struct LunarVCOCore {
                 out = (phase < 0.5f) ? (4.f * phase - 1.f) : (3.f - 4.f * phase);
                 break;
             case WAVE_INV_SAW:
-                // Ramp resets (falls back to +1) at phase == 0 — PolyBLEP-correct that edge.
+                // Ramp resets (falls back to +1) at phase == 0 — PolyBLEP-
+                // correct that edge (band-limiting, matters most at high
+                // pitch); the edge smoothing pass below adds the extra
+                // rounded-corner character on top.
                 out = -saw + polyBlep(phase, dt);
                 break;
             case WAVE_SQUARE: {
                 // shape = pulse width here; two hard edges per cycle (rise at
-                // phase == 0, fall at phase == duty) — correct both. Clamp
-                // away from 0/1: at the extremes the duty cycle degenerates
-                // to permanent silence (or DC), i.e. no pulse at all.
+                // phase == 0, fall at phase == duty) — PolyBLEP-correct both
+                // (band-limiting); the edge smoothing pass below adds the
+                // extra rounded-corner character on top. Clamp away from
+                // 0/1: at the extremes the duty cycle degenerates to
+                // permanent silence (or DC), i.e. no pulse at all.
                 float duty = clamp(shape, 0.02f, 0.98f);
                 out = (phase < duty) ? 1.f : -1.f;
                 out += polyBlep(phase, dt);
@@ -105,6 +133,12 @@ struct LunarVCOCore {
                 out = 0.f;
         }
 
+        if (waveform != WAVE_SINE) {
+            out = smoothEdge(cornerSmooth, out, freq, sampleTime);
+        } else {
+            cornerSmooth = out; // stay primed so switching waveform mid-play doesn't glitch
+        }
+
         if (subOscOn) {
             float subDt = subFreq * sampleTime;
             subPhase += subDt;
@@ -112,6 +146,7 @@ struct LunarVCOCore {
             float sub = (subPhase < 0.5f) ? 1.f : -1.f;
             sub += polyBlep(subPhase, subDt);
             sub -= polyBlep(std::fmod(subPhase - 0.5f + 1.f, 1.f), subDt);
+            sub = smoothEdge(subSmooth, sub, subFreq, sampleTime);
             out += sub;
             out *= 0.5f; // keep overall level in check with the sub mixed in
         }
