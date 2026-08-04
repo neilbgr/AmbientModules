@@ -4,13 +4,19 @@
 using namespace rack;
 
 // One "Classic Solar 50" drone voice: 5 sawtooth oscillators with a shared
-// VOLT control (negative = detune all down together, positive = cross-
-// modulate active oscillators). Pure DSP, no Module/param/light dependency —
-// reusable as-is for multiple voice slots in a future multi-voice panel.
+// VOLT control. Per the official doc: "transposes down all 5 voice
+// generators at the same time. After half the stroke of the knob,
+// generators start to modulate each other creating FM synthesis effect" —
+// i.e. knob 0%..50% (volt 0..0.5) ramps all 5 oscillators from unchanged
+// down to max detune; 50%..100% (volt 0.5..1) keeps that detune frozen at
+// max while ramping in FM depth, so FM always applies on top of the
+// already-detuned-down pitch, never on the original pitch. Pure DSP, no
+// Module/param/light dependency — reusable as-is for multiple voice slots
+// in a future multi-voice panel.
 struct DroneVoice {
     static const int NUM_OSC = 5;
-    static constexpr float DETUNE_MAX_OCTAVES = 2.f; // max detune at volt = -1
-    static constexpr float FM_DEPTH_OCTAVES = 1.f;   // max FM depth at volt = +1
+    static constexpr float DETUNE_MAX_OCTAVES = 2.f; // max detune, reached at volt = 0.5 (and held through 1)
+    static constexpr float FM_DEPTH_OCTAVES = 1.f;   // max FM depth at volt = 1
 
     float phase[NUM_OSC] = {};
     float prevSaw[NUM_OSC] = {};
@@ -19,14 +25,17 @@ struct DroneVoice {
     // pitchParams: per-oscillator base pitch (octaves rel. C4).
     // active/mod: per-oscillator mute + "shared CV modulates this one" flags.
     // cv: shared pitch CV (already scaled by the attenuverter).
-    // volt: VOLT knob+CV value, already clamped to -1..1.
+    // volt: VOLT knob+CV value, already clamped to 0..1 (0% = unchanged, 100% = full stroke).
     // Returns the raw summed sawtooth mix (NOT yet divided by NUM_OSC or scaled to volts).
     float process(float sampleTime, float sampleRate,
                    const float pitchParams[NUM_OSC],
                    const bool active[NUM_OSC], const bool mod[NUM_OSC],
                    float cv, float volt) {
-        float detuneOctaves = std::fmin(volt, 0.f) * DETUNE_MAX_OCTAVES;
-        float fmAmount = std::fmax(volt, 0.f);
+        // 0%..50% (volt 0..0.5): ramp from unchanged (0) to max detune.
+        // 50%..100% (volt 0.5..1): stay frozen at max detune (clamp holds it
+        // at 1) while fmAmount ramps in below.
+        float detuneOctaves = -DETUNE_MAX_OCTAVES * clamp(volt * 2.f, 0.f, 1.f);
+        float fmAmount = clamp((volt - 0.5f) * 2.f, 0.f, 1.f);
 
         float mix = 0.f;
         float newPrevSaw[NUM_OSC];

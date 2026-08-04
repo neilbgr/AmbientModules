@@ -68,7 +68,7 @@ struct Lunar50Drone : Module {
         configOutput(ENV_OUTPUT, "Envelope");
         configInput(ENV_INPUT, "Envelope CV (overrides internal envelope, gate and hold when connected — for chaining several drones on one envelope)");
 
-        configParam(VOLT_PARAM, -1.f, 1.f, 0.f, "Volt (detune / FM)");
+        configParam(VOLT_PARAM, 0.f, 1.f, 0.f, "Volt (detune / FM)", "%", 0.f, 100.f);
         configInput(VOLT_CV_INPUT, "Volt CV");
     }
 
@@ -122,10 +122,12 @@ struct Lunar50Drone : Module {
             if (active[i]) activeCount++;
         }
 
-        // VOLT knob: negative half detunes all 5 oscillators down together;
-        // positive half cross-modulates active oscillators (FM synthesis effect).
-        // ±5V CV, added to the knob and clamped back into the knob's own -1..1 range.
-        float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 5.f, -1.f, 1.f);
+        // VOLT knob, per the official doc: "transposes down all 5 voice
+        // generators at the same time. After half the stroke of the knob,
+        // generators start to modulate each other creating FM synthesis
+        // effect" — see DroneVoice::process() for the detune/FM curve.
+        // 0..10V CV, added to the knob and clamped back into the knob's own 0..1 range.
+        float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
         float attack = params[ATTACK_PARAM].getValue();
