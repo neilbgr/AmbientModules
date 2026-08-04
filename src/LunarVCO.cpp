@@ -49,6 +49,7 @@ struct LunarVCO : Module {
 
     LunarVCOCore vco[PORT_MAX_CHANNELS];
     ADSREnvelope env[PORT_MAX_CHANNELS];
+    dsp::SchmittTrigger gateTrigger[PORT_MAX_CHANNELS];
 
     LunarVCO() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -130,12 +131,11 @@ struct LunarVCO : Module {
             if (envInputConnected) {
                 envValue = clamp(inputs[ENV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
             } else {
-                bool gate = inputs[GATE_INPUT].getPolyVoltage(c) >= 1.f;
-                // Priority: ENV input > Gate input > Hold button — once a gate
-                // is patched in, it fully takes over and Hold no longer forces
-                // the envelope open behind its back.
-                bool effectiveHold = gateInputConnected ? false : hold;
-                envValue = env[c].process(args.sampleTime, gate, selfGen, effectiveHold, attack, decay, sustain, release);
+                gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
+                bool gate = gateTrigger[c].isHigh();
+                // Priority: ENV input > Hold button > Gate input.
+                bool effectiveGate = hold || (gateInputConnected && gate);
+                envValue = env[c].process(args.sampleTime, effectiveGate, selfGen, attack, decay, sustain, release);
             }
             maxEnvValue = std::max(maxEnvValue, envValue);
 
