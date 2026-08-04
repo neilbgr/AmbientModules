@@ -147,10 +147,7 @@ struct Lunar50Drone : Module {
                 envValue = inputs[ENV_INPUT].getPolyVoltage(c) / 10.f;
             } else {
                 gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
-                // Priority: ENV input > Gate input > Hold button — once a gate
-                // is patched in, it fully takes over and Hold no longer forces
-                // the envelope open behind its back.
-                bool gateHigh = gateInputConnected ? gateTrigger[c].isHigh() : holdActive;
+                bool gateHigh = holdActive || (gateInputConnected && gateTrigger[c].isHigh());
 
                 envelope[c].updateCoefficients(attack, release);
                 envValue = envelope[c].process(args.sampleTime, gateHigh);

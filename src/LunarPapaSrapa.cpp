@@ -186,7 +186,7 @@ struct LunarPapaSrapa : Module {
                 envValue = inputs[ENV_INPUT].getPolyVoltage(c) / 10.f;
             } else {
                 gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
-                bool gateHigh = gateInputConnected ? gateTrigger[c].isHigh() : holdActive;
+                bool gateHigh = holdActive || (gateInputConnected && gateTrigger[c].isHigh());
                 envelope[c].updateCoefficients(attack, release);
                 envValue = envelope[c].process(args.sampleTime, gateHigh);
             }
