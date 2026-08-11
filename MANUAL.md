@@ -1,6 +1,6 @@
 # AmbientModules — User Manual
 
-**AmbientModules** is a small collection of VCV Rack / Cardinal modules inspired by the [Elta Music](https://www.eltamusic.com) [ **SOLAR 42F** "Ambient Drone Machine"](https://www.eltamusic.com/solar-42)  — an analogue microtonal drone synthesizer. Rather than reproducing the SOLAR 42F's fixed hardware layout, each of its sound engines is broken out here into an independent, freely-patchable Rack module:
+**AmbientModules** is a small collection of VCV Rack / Cardinal modules inspired by the [Elta Music](https://www.eltamusic.com) [ **SOLAR 42F** "Ambient Drone Machine"](https://www.eltamusic.com/solar-42f)  — an analogue microtonal drone synthesizer. Rather than reproducing the SOLAR 42F's fixed hardware layout, each of its sound engines is broken out here into an independent, freely-patchable Rack module:
 
 | Module | SOLAR 42F equivalent | What it does |
 |---|---|---|
@@ -75,9 +75,6 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 - **Envelope** — 0–10V copy of the envelope currently shaping the mix.
 
 **LEDs**
-- **Oscillator 1–5 active** (red, built into the Active button) — lit while that oscillator is active.
-- **Oscillator 1–5 modulation** (white, built into the Modulation button) — lit while that oscillator's modulation is enabled.
-- **Hold** (white, built into the Hold button) — lit while Hold is engaged.
 - **Envelope** (yellow, standalone) — brightness follows the envelope's current level, so it glows brighter as the drone swells and dims as it releases.
 
 <a id="lunar50drone-context-menu"></a>
@@ -122,11 +119,6 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 - **Envelope Out** — 0–10V copy of the ADSR currently shaping Audio Out.
 
 **LEDs**
-- **Octave** (white, built into the Octave button) — lit when the +3 octave range is selected (off = Low).
-- **Sub oscillator** (white, built into the Sub button) — lit while the sub-oscillator is on.
-- **FM mode** (white, built into the FM mode button) — lit when Exponential FM is selected (off = Linear).
-- **Hold** (white, built into the Hold button) — lit while Hold is engaged.
-- **Self-generation** (white, built into the Self-generation button) — lit while self-generation mode is on.
 - **Envelope** (yellow, standalone) — brightness follows the ADSR's current level, glowing brighter through Attack/Sustain and dimming through Decay/Release.
 
 **Patch ideas**
@@ -191,10 +183,6 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 - **Envelope** — 0–10V copy of the envelope currently shaping VCO Out.
 
 **LEDs**
-- **FM** (white, built into the FM button) — lit while FM routing is enabled.
-- **AM** (white, built into the AM button) — lit while AM routing is enabled.
-- **Noise only** (white, built into the Noise only button) — lit while forced noise-only mode is on.
-- **Hold** (white, built into the Hold button) — lit while Hold is engaged.
 - **Envelope** (yellow, standalone) — brightness follows the envelope's current level.
 - **Sample & Hold** (blue, standalone) — flashes with each new sample, brightness proportional to the sampled value's magnitude.
 
