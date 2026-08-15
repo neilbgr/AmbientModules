@@ -174,8 +174,14 @@ struct LunarSequencer : Module {
         float cvNorm = params[STEP_CV_PARAM + stepIndex].getValue();
         outputs[CV_OUTPUT].setVoltage(rangeMin + cvNorm * (rangeMax - rangeMin));
 
+        // Always a clean 0/10V logic gate, regardless of the external clock's
+        // actual shape/duty-cycle/amplitude — clockTrigger.isHigh() reflects
+        // its thresholded (0.1V/1V hysteresis) high/low state rather than
+        // passing the raw voltage through, matching the internal pulser's
+        // already-clean square wave (see CLOCK_OUTPUT above for the
+        // pass-through of the raw clock shape instead, if that's wanted).
         bool gateEnabled = params[STEP_GATE_PARAM + stepIndex].getValue() > 0.f;
-        outputs[GATE_OUTPUT].setVoltage(gateEnabled ? effectiveClockVoltage : 0.f);
+        outputs[GATE_OUTPUT].setVoltage(gateEnabled && clockTrigger.isHigh() ? 10.f : 0.f);
 
         for (int i = 0; i < NUM_STEPS; i++) {
             lights[STEP_GATE_LIGHT + i].setBrightness(params[STEP_GATE_PARAM + i].getValue() > 0.f ? 1.f : 0.f);

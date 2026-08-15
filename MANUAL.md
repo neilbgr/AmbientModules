@@ -44,7 +44,7 @@ Some modules add extra entries of their own — those are documented under the m
 A few behaviors repeat across several modules and are only explained here:
 
 - **V/OCT.** Pitch inputs follow the standard 1 volt per octave convention (0V = C4), like any other Rack oscillator.
-- **Polyphony.** Lunar50Drone, LunarVCO, and LunarPapaSrapa are polyphonic: they follow the channel count of their main CV/gate inputs, so patching a polyphonic V/OCT or Gate signal (from a polyphonic sequencer, MIDI-to-CV, etc.) drives independent voices per channel.
+- **Polyphony.** Lunar50Drone, LunarVCO, and LunarPapaSrapa are polyphonic: they follow the channel count of their main CV/Gate inputs, or of the Envelope CV input, whichever is highest — so patching a polyphonic V/OCT or Gate signal (from a polyphonic sequencer, MIDI-to-CV, etc.), or chaining another module's polyphonic Envelope output into Envelope CV, drives independent voices per channel.
 - **Envelope CV override.** Lunar50Drone, LunarVCO, and LunarPapaSrapa each have an **Envelope CV** input. When it's patched, it completely replaces that module's internal envelope, its Gate input, and its Hold switch — handy for driving several of these modules from one shared envelope so their amplitudes stay locked together.
 - **Hold.** Also shared by those same three modules: a **Hold** switch that, when engaged, forces the envelope open permanently (an "always on" drone) — same effect as holding the Gate input high, and the same switch is overridden the moment the Envelope CV input is patched.
 
@@ -163,23 +163,23 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 - **Modulation depth** — how strongly the modulator affects the audio oscillator, plus its CV input.
 - **Divider** — divides down the modulator's frequency relative to the audio oscillator, plus its CV input.
 - **Pitch** — the audio oscillator's pitch, spanning C0 to E7.
-- **Noise** — mix level of the independent white noise generator.
+- **Noise** — mix level of the internal white noise source, shared across every polyphonic voice (not decorrelated per voice — the real hardware only has one noise generator per module).
 - **Noise only** (lit button) — forces a clean white-noise-only output, overriding Pitch/FM/AM/Divider.
 - **Attack / Release** — the shared envelope.
 - **Hold** (lit button) — see [Shared conventions](#shared-conventions).
 
 **Inputs**
 - **Pitch CV** — 1V/oct, sums onto the Pitch knob.
-- **Modulation depth CV**, **Divider CV** — sum onto their respective knobs.
-- **Sample & hold clock** — samples a new value on each rising edge.
-- **Sample & hold input** — the source to sample; normalled to the internal noise generator when nothing is patched here.
+- **Modulation depth CV**, **Divider CV** — sum onto their respective knobs. Monophonic: only channel 1 is read, even from a polyphonic cable — the internal modulator is a single shared LFO, not one per voice (see LFO output below).
+- **Sample & hold clock** — samples a new value on each rising edge. Monophonic (channel 1 only).
+- **Sample & hold input** — the source to sample; normalled to the internal noise generator when nothing is patched here. Monophonic (channel 1 only).
 - **Gate** — opens the envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 - **Envelope CV** — see [Shared conventions](#shared-conventions).
 
 **Outputs**
 - **VCO (enveloped)** — the main cross-modulated/noise audio output, shaped by the envelope.
-- **LFO** — the raw low-frequency modulator signal, always running.
-- **Sample & hold** — the current sampled value.
+- **LFO** — the raw low-frequency modulator signal, always running while patched. Monophonic — a single shared modulator drives FM/AM for every voice, matching the real hardware's one LFO per module.
+- **Sample & hold** — the current sampled value. Monophonic.
 - **Envelope** — 0–10V copy of the envelope currently shaping VCO Out.
 
 **LEDs**
@@ -207,7 +207,7 @@ A classic, Buchla-inspired 5-stage sequential voltage source: each step stores i
 
 **Outputs**
 - **Clock Out** — the clock currently driving the sequence (buffered internal Pulser, or a copy of Clock In when connected).
-- **Step gate** — the current step's gate, following its Step gate switch and the clock.
+- **Step gate** — the current step's gate: high (10V) whenever the clock is high and that step's Step gate switch is enabled. Always a clean 0V/10V logic level matching the clock's own duty cycle, even with an external Clock In of unusual shape/amplitude — not a raw copy of its voltage (see Clock Out above for that instead).
 - **Step CV** — the current step's CV, rescaled into the range set by CV Range.
 
 **LEDs**
