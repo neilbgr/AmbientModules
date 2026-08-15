@@ -97,9 +97,11 @@ struct Lunar50Drone : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        // Poly channel count driven by both CV and gate, so a sequencer that
-        // only sets one of the two (e.g. mono CV, poly gate) doesn't drop notes.
-        int channels = std::max(std::max(inputs[CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), 1);
+        // Poly channel count driven by CV, gate, AND the envelope input, so
+        // that chaining another module's poly ENV_OUTPUT into ENV_INPUT
+        // (overriding the internal envelope/gate entirely) still drives all
+        // of its channels even when CV and Gate are mono or unpatched.
+        int channels = std::max(std::max(inputs[CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), std::max(inputs[ENV_INPUT].getChannels(), 1));
 
         bool active[NUM_OSC];
         bool mod[NUM_OSC];

@@ -58,11 +58,11 @@ struct LunarPapaSrapa : Module {
     enum InputIds {
         GATE_INPUT,
         PITCH_CV_INPUT,     // 1V/oct, sums onto PITCH_PARAM
-        SH_CLOCK_INPUT,
-        SH_INPUT,           // sample & hold source, normalled to the internal noise
+        SH_CLOCK_INPUT,     // read from channel 0 only (S&H is monophonic)
+        SH_INPUT,           // sample & hold source, normalled to the internal noise; read from channel 0 only (S&H is monophonic)
         ENV_INPUT,
-        MOD_CV_INPUT,       // sums onto MOD_PARAM
-        DIVIDER_CV_INPUT,   // sums onto DIVIDER_PARAM
+        MOD_CV_INPUT,       // sums onto MOD_PARAM; read from channel 0 only (the internal LFO is monophonic)
+        DIVIDER_CV_INPUT,   // sums onto DIVIDER_PARAM; read from channel 0 only (the internal LFO is monophonic)
         NUM_INPUTS
     };
     enum OutputIds {
@@ -83,10 +83,24 @@ struct LunarPapaSrapa : Module {
     };
 
     PapaSrapaCore core[PORT_MAX_CHANNELS];
+    // The internal LFO/modulator is always monophonic (see process()) — a
+    // single instance shared by every poly channel's FM/AM and by the
+    // (mono) LFO_OUTPUT.
+    PapaSrapaModulator modulator;
     AREnvelope envelope[PORT_MAX_CHANNELS];
     dsp::SchmittTrigger gateTrigger[PORT_MAX_CHANNELS];
-    dsp::SchmittTrigger clockTrigger[PORT_MAX_CHANNELS];
-    float shValue[PORT_MAX_CHANNELS] = {};
+    // Sample & hold is always monophonic too (one clock, one held value),
+    // same simplification as the LFO/modulator above. shNoiseState is its
+    // own PRNG state, decoupled from each voice's own noise generator (see
+    // PapaSrapaCore) — it only ever needs to advance on a clock edge, not
+    // continuously every sample.
+    dsp::SchmittTrigger shClockTrigger;
+    float shValue = 0.f;
+    uint32_t shNoiseState = 0x1234567u;
+    // The white-noise mix into the audio output is also a single shared
+    // source (see process()) rather than one generator per poly voice —
+    // decoupled from shNoiseState above since the two are gated separately.
+    uint32_t noiseState = 0x1234567u;
 
     LunarPapaSrapa() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -156,31 +170,31 @@ struct LunarPapaSrapa : Module {
         float attack = params[ATTACK_PARAM].getValue();
         float release = params[RELEASE_PARAM].getValue();
 
-        int channels = std::max(std::max(inputs[PITCH_CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), 1);
+        bool lfoOutputConnected = outputs[LFO_OUTPUT].isConnected();
+        bool vcoOutputConnected = outputs[VCO_OUT].isConnected();
+        bool shInputConnected = inputs[SH_INPUT].isConnected();
+        float noiseAmount = params[NOISE_PARAM].getValue();
 
-        float maxEnvValue = 0.f;
-        float maxShAbs = 0.f;
+        // The internal LFO/modulator is always monophonic: MOD_CV_INPUT and
+        // DIVIDER_CV_INPUT are read from channel 0 only, so a poly cable
+        // patched into either only affects the shared modulator through its
+        // first channel, matching the real hardware's single LFO per module.
+        float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getPolyVoltage(0) / 10.f, 0.f, 1.f);
+        float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getPolyVoltage(0) / 10.f, 0.f, 1.f);
+
+        // Poly channel count driven by CV, gate, AND the envelope input, so
+        // that chaining another module's poly ENV_OUTPUT into ENV_INPUT
+        // (overriding the internal envelope/gate entirely) still drives all
+        // of its channels even when Pitch CV and Gate are mono or unpatched.
+        int channels = std::max(std::max(inputs[PITCH_CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), std::max(inputs[ENV_INPUT].getChannels(), 1));
+
+        // Pass 1: envelopes are cheap (no std::exp) — compute them all up
+        // front so we know whether ANY channel needs the expensive
+        // oscillator engine before deciding whether to run the mod.
+        float envValues[PORT_MAX_CHANNELS];
+        float envAmounts[PORT_MAX_CHANNELS];
+        bool anyComputeAudio = false;
         for (int c = 0; c < channels; c++) {
-            float pitchOctaves = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getPolyVoltage(c);
-            float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
-            float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
-
-            // Unlike Lunar50Drone's oscillator bank, this core is already cheap
-            // (2 square oscillators + a noise sample, no sin/asin) and the noise
-            // sample must stay continuously fresh for the S&H below even when
-            // the envelope is at 0 (silent gate) — so it always runs, matching
-            // LunarVCO's approach rather than Lunar50Drone's envelope-gated skip.
-            float vco = core[c].process(args.sampleTime, args.sampleRate, rateOctaves,
-                dividerAmount, pitchOctaves, modAmount,
-                mode, params[NOISE_PARAM].getValue(), noiseOnly);
-
-            if (clockTrigger[c].process(inputs[SH_CLOCK_INPUT].getPolyVoltage(c))) {
-                shValue[c] = inputs[SH_INPUT].isConnected() ? inputs[SH_INPUT].getPolyVoltage(c) / OUTPUT_VOLTAGE : core[c].noise;
-            }
-            maxShAbs = std::max(maxShAbs, std::fabs(shValue[c]));
-            outputs[SH_OUTPUT].setVoltage(shValue[c] * OUTPUT_VOLTAGE, c);
-            outputs[LFO_OUTPUT].setVoltage(core[c].lfoOut * OUTPUT_VOLTAGE, c);
-
             float envValue;
             if (envInputConnected) {
                 envValue = inputs[ENV_INPUT].getPolyVoltage(c) / 10.f;
@@ -190,22 +204,68 @@ struct LunarPapaSrapa : Module {
                 envelope[c].updateCoefficients(attack, release);
                 envValue = envelope[c].process(args.sampleTime, gateHigh);
             }
-
+            envValues[c] = envValue;
             float envAmount = clamp(envValue, 0.f, 1.f);
+            envAmounts[c] = envAmount;
+            if (vcoOutputConnected && envAmount > 0.f)
+                anyComputeAudio = true;
+        }
+
+        // Mod is only ever used for LFO_OUTPUT or for the audio oscillators'
+        // FM/AM (bypassed entirely in Noise-only mode) — skip it otherwise.
+        // Computed once regardless of channel count (see PapaSrapaModulator).
+        bool needMod = lfoOutputConnected || (anyComputeAudio && !noiseOnly);
+        float modSquare = needMod ? modulator.process(args.sampleTime, rateOctaves, dividerAmount) : modulator.lfoOut;
+
+        // The audio noise mix is a single shared source too — one sample per
+        // process() call is enough even with the main VCO polyphonic, since
+        // every channel mixes in the same value at its own noiseAmount.
+        // Computed only when actually needed (mixed in, or noiseOnly bypass).
+        bool needNoise = anyComputeAudio && (noiseOnly || noiseAmount > 0.f);
+        float noiseSample = needNoise ? PapaSrapaCore::nextNoise(noiseState) : 0.f;
+
+        outputs[LFO_OUTPUT].setChannels(1);
+        outputs[LFO_OUTPUT].setVoltage(modulator.lfoOut * OUTPUT_VOLTAGE);
+
+        // Sample & hold is always monophonic: one clock, one held value. The
+        // internal noise source only needs to advance exactly on a clock
+        // edge — S&H never reads it in between anyway — so there's no
+        // "stay fresh every sample" cost at all here (unlike each voice's
+        // own noise, which is mixed continuously into the audio below).
+        if (shClockTrigger.process(inputs[SH_CLOCK_INPUT].getPolyVoltage(0))) {
+            shValue = shInputConnected ? inputs[SH_INPUT].getPolyVoltage(0) / OUTPUT_VOLTAGE
+                                        : PapaSrapaCore::nextNoise(shNoiseState);
+        }
+        outputs[SH_OUTPUT].setChannels(1);
+        outputs[SH_OUTPUT].setVoltage(shValue * OUTPUT_VOLTAGE);
+        lights[SH_LIGHT].setBrightness(clamp(std::fabs(shValue), 0.f, 1.f));
+
+        float maxEnvValue = 0.f;
+        for (int c = 0; c < channels; c++) {
+            float pitchOctaves = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getPolyVoltage(c);
+
+            float envValue = envValues[c];
+            float envAmount = envAmounts[c];
             maxEnvValue = std::max(maxEnvValue, envAmount);
+
+            // VCO_OUT is enveloped, so its audio oscillator is only computed
+            // when patched AND the envelope is above 0 (silent otherwise,
+            // same idea as Lunar50Drone).
+            bool computeAudio = vcoOutputConnected && envAmount > 0.f;
+
+            float vco = core[c].process(args.sampleTime, args.sampleRate, pitchOctaves,
+                modSquare, modAmount, mode, noiseSample, noiseAmount, noiseOnly,
+                computeAudio);
 
             outputs[VCO_OUT].setVoltage(vco * OUTPUT_VOLTAGE * envAmount, c);
             outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
         }
 
-        outputs[LFO_OUTPUT].setChannels(channels);
         outputs[VCO_OUT].setChannels(channels);
         outputs[ENV_OUTPUT].setChannels(channels);
-        outputs[SH_OUTPUT].setChannels(channels);
 
         lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
         lights[ENV_LIGHT].setBrightness(maxEnvValue);
-        lights[SH_LIGHT].setBrightness(clamp(maxShAbs, 0.f, 1.f));
     }
 };
 

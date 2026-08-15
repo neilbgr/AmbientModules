@@ -94,7 +94,11 @@ struct LunarVCO : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        int channels = std::max(inputs[VOCT_INPUT].getChannels(), 1);
+        // Poly channel count driven by CV, gate, AND the envelope input, so
+        // that chaining another module's poly ENV_OUTPUT into ENV_INPUT
+        // (overriding the internal envelope/gate entirely) still drives all
+        // of its channels even when V/oct and Gate are mono or unpatched.
+        int channels = std::max(std::max(inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), std::max(inputs[ENV_INPUT].getChannels(), 1));
 
         bool expMode = params[LINEXP_PARAM].getValue() > 0.f;
         bool octaveOn = params[OCTAVE_PARAM].getValue() > 0.f;
@@ -117,16 +121,6 @@ struct LunarVCO : Module {
         for (int c = 0; c < channels; c++) {
             float pitch = tune + inputs[VOCT_INPUT].getPolyVoltage(c);
 
-            float fmCv = inputs[FM_INPUT].getPolyVoltage(c) * fmCvAtten;
-            float expFm = expMode ? fmCv : 0.f;
-            float linFm = expMode ? 0.f : fmCv * 100.f; // Hz scale, adjustable by ear
-
-            float shape = clamp(shapeParam
-                + inputs[SHAPE_CV_INPUT].getPolyVoltage(c) / 10.f * shapeCvAtten, 0.f, 1.f);
-
-            float dry = vco[c].process(args.sampleTime, args.sampleRate, pitch, expFm, linFm,
-                waveform, shape, octaveOn, subOscOn, inputs[SYNC_INPUT].getPolyVoltage(c));
-
             float envValue;
             if (envInputConnected) {
                 envValue = clamp(inputs[ENV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
@@ -138,6 +132,27 @@ struct LunarVCO : Module {
                 envValue = env[c].process(args.sampleTime, effectiveGate, selfGen, attack, decay, sustain, release);
             }
             maxEnvValue = std::max(maxEnvValue, envValue);
+
+            // Voice silent (envValue == 0, reliable once STAGE_IDLE/SUSTAIN
+            // settle — see ADSREnvelope) or VCO_OUTPUT not patched: output
+            // would be zero/unheard anyway, skip the AS3340-style oscillator
+            // engine entirely (same idea as Lunar50Drone). In poly, this is
+            // what keeps released/idle voices cheap. Effectively a no-op
+            // whenever selfGen keeps envValue away from exactly zero, or an
+            // external ENV_INPUT never touches exactly 0V — worst case falls
+            // back to today's per-sample cost, never worse.
+            float dry = 0.f;
+            if (envValue > 0.f && outputs[VCO_OUTPUT].isConnected()) {
+                float fmCv = inputs[FM_INPUT].getPolyVoltage(c) * fmCvAtten;
+                float expFm = expMode ? fmCv : 0.f;
+                float linFm = expMode ? 0.f : fmCv * 100.f; // Hz scale, adjustable by ear
+
+                float shape = clamp(shapeParam
+                    + inputs[SHAPE_CV_INPUT].getPolyVoltage(c) / 10.f * shapeCvAtten, 0.f, 1.f);
+
+                dry = vco[c].process(args.sampleTime, args.sampleRate, pitch, expFm, linFm,
+                    waveform, shape, octaveOn, subOscOn, inputs[SYNC_INPUT].getPolyVoltage(c));
+            }
 
             outputs[VCO_OUTPUT].setVoltage(dry * 5.f * envValue, c);
             outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
