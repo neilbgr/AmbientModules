@@ -32,9 +32,13 @@ struct LunarLFO : Module {
     // matches Fundamental's 0.0039..1024 Hz range exactly (2^-8 .. 2^10).
     static constexpr float RATE_MIN_OCT = -8.f;
     static constexpr float RATE_MAX_OCT = 10.f;
+    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
+    // representable in float, and a compile-time literal removes any
+    // dependency on the compiler actually folding a runtime powf call.
+    static constexpr float TWO_POW_30 = 1073741824.f;
 
     static float octavesToHz(float octaves) {
-        return dsp::approxExp2_taylor5(octaves + 30.f) / std::pow(2.f, 30.f);
+        return dsp::approxExp2_taylor5(octaves + 30.f) / TWO_POW_30;
     }
 
     LunarLFO() {

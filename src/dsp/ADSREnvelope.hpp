@@ -21,6 +21,10 @@ struct ADSREnvelope {
     // in bounded time, instead of approaching it forever (same trick as
     // Fundamental's ADSR, which uses 1.01f for its attack target).
     static constexpr float TARGET_OVERSHOOT = 0.01f;
+    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
+    // representable in float, and a compile-time literal removes any
+    // dependency on the compiler actually folding a runtime powf call.
+    static constexpr float TWO_POW_30 = 1073741824.f;
 
     enum Stage { STAGE_IDLE, STAGE_ATTACK, STAGE_DECAY, STAGE_SUSTAIN, STAGE_RELEASE };
 
@@ -28,14 +32,18 @@ struct ADSREnvelope {
     Stage stage = STAGE_IDLE;
     bool prevGate = false;
 
+    // knobValue in [0,1] -> lambda (1/time). Attack/decay/release knobs are
+    // non-poly (same for every channel), so callers should compute the 3
+    // lambdas once per process() call and pass them to process() below
+    // rather than recomputing per channel.
     static float lambdaFromKnob(float knobValue) {
-        float time = MIN_TIME * dsp::approxExp2_taylor5(LOG2_RATIO * knobValue + 30.f) / std::pow(2.f, 30.f);
+        float time = MIN_TIME * dsp::approxExp2_taylor5(LOG2_RATIO * knobValue + 30.f) / TWO_POW_30;
         return 1.f / time;
     }
 
     // Returns the envelope value in [0, 1].
     float process(float sampleTime, bool gate, bool selfGenerate,
-                   float attackKnob, float decayKnob, float sustainLevel, float releaseKnob) {
+                   float attackLambda, float decayLambda, float sustainLevel, float releaseLambda) {
         bool risingEdge = gate && !prevGate;
         prevGate = gate;
 
@@ -53,10 +61,10 @@ struct ADSREnvelope {
         float target = 0.f;
         float lambda = 0.f;
         switch (stage) {
-            case STAGE_ATTACK:  target = 1.f + TARGET_OVERSHOOT; lambda = lambdaFromKnob(attackKnob);  break;
-            case STAGE_DECAY:   target = sustainLevel;            lambda = lambdaFromKnob(decayKnob);   break;
-            case STAGE_SUSTAIN: target = sustainLevel;            lambda = 0.f;                          break;
-            case STAGE_RELEASE: target = -TARGET_OVERSHOOT;       lambda = lambdaFromKnob(releaseKnob); break;
+            case STAGE_ATTACK:  target = 1.f + TARGET_OVERSHOOT; lambda = attackLambda;  break;
+            case STAGE_DECAY:   target = sustainLevel;            lambda = decayLambda;   break;
+            case STAGE_SUSTAIN: target = sustainLevel;            lambda = 0.f;            break;
+            case STAGE_RELEASE: target = -TARGET_OVERSHOOT;       lambda = releaseLambda; break;
             default: break;
         }
 

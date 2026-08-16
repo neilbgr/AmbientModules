@@ -17,6 +17,10 @@ struct DroneVoice {
     static const int NUM_OSC = 5;
     static constexpr float DETUNE_MAX_OCTAVES = 2.f; // max detune, reached at volt = 0.5 (and held through 1)
     static constexpr float FM_DEPTH_OCTAVES = 1.f;   // max FM depth at volt = 1
+    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
+    // representable in float, and a compile-time literal removes any
+    // dependency on the compiler actually folding a runtime powf call.
+    static constexpr float TWO_POW_30 = 1073741824.f;
 
     float phase[NUM_OSC] = {};
     float prevSaw[NUM_OSC] = {};
@@ -72,7 +76,7 @@ struct DroneVoice {
             float pitch = pitchParams[i] + (mod[i] ? cv : 0.f)
                           + detuneOctaves + fmAmount * fmSource * FM_DEPTH_OCTAVES;
 
-            float freq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitch + 30.f) / std::pow(2.f, 30.f);
+            float freq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitch + 30.f) / TWO_POW_30;
             freq = clamp(freq, 0.f, sampleRate / 2.f);
 
             // Phase keeps running even when inactive, so re-enabling an

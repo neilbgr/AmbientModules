@@ -132,8 +132,11 @@ struct Lunar50Drone : Module {
         float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
-        float attack = params[ATTACK_PARAM].getValue();
-        float release = params[RELEASE_PARAM].getValue();
+        // Attack/Release knobs are non-poly (same for every channel) — compute
+        // the lambdas once here instead of recomputing approxExp2_taylor5
+        // per channel inside the loop below.
+        float attackLambda = AREnvelope::lambdaFromKnob(params[ATTACK_PARAM].getValue());
+        float releaseLambda = AREnvelope::lambdaFromKnob(params[RELEASE_PARAM].getValue());
         bool envInputConnected = inputs[ENV_INPUT].isConnected();
         bool gateInputConnected = inputs[GATE_INPUT].isConnected();
         float atten = params[ATTEN_PARAM].getValue();
@@ -151,8 +154,7 @@ struct Lunar50Drone : Module {
                 gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
                 bool gateHigh = holdActive || (gateInputConnected && gateTrigger[c].isHigh());
 
-                envelope[c].updateCoefficients(attack, release);
-                envValue = envelope[c].process(args.sampleTime, gateHigh);
+                envValue = envelope[c].process(args.sampleTime, gateHigh, attackLambda, releaseLambda);
             }
             float envAmount = clamp(envValue, 0.f, 1.f);
             maxEnvValue = std::max(maxEnvValue, envAmount);

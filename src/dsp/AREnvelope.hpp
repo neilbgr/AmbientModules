@@ -13,29 +13,26 @@ struct AREnvelope {
     // in bounded time (proportional to the knob), instead of approaching it
     // forever (same trick as ADSREnvelope/Fundamental's ADSR).
     static constexpr float TARGET_OVERSHOOT = 0.01f;
+    // Same +30/2^30 trick as DroneVoice's pitch-to-freq: keeps the exponent
+    // argument non-negative for approxExp2_taylor5, cancelled out afterwards.
+    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
+    // representable in float, and a compile-time literal removes any
+    // dependency on the compiler actually folding a runtime powf call.
+    static constexpr float TWO_POW_30 = 1073741824.f;
 
     float out = 0.f;
-    float attackLambda = 1.f / MIN_TIME;
-    float releaseLambda = 1.f / MIN_TIME;
 
-    // Same +30/pow(2,30) trick as DroneVoice's pitch-to-freq: keeps the
-    // exponent argument non-negative for approxExp2_taylor5, cancelled out
-    // afterwards. std::pow(2.f, 30.f) has literal args so it's folded at
-    // compile time — no runtime powf call, unlike a direct std::pow(ratio, knob).
+    // knobValue in [0,1] -> lambda (1/time) in exponential taper MIN_TIME..MAX_TIME.
+    // Attack/release knobs are non-poly (same for every channel), so callers
+    // should compute this once per process() call and pass the result to
+    // process() below rather than recomputing it per channel.
     static float lambdaFromKnob(float knobValue) {
-        // knobValue in [0,1] -> time in seconds, exponential taper MIN_TIME..MAX_TIME
-        float time = MIN_TIME * dsp::approxExp2_taylor5(LOG2_RATIO * knobValue + 30.f) / std::pow(2.f, 30.f);
+        float time = MIN_TIME * dsp::approxExp2_taylor5(LOG2_RATIO * knobValue + 30.f) / TWO_POW_30;
         return 1.f / time;
     }
 
-    // Cheap enough to call every sample directly — no throttling needed.
-    void updateCoefficients(float attackKnob, float releaseKnob) {
-        attackLambda = lambdaFromKnob(attackKnob);
-        releaseLambda = lambdaFromKnob(releaseKnob);
-    }
-
     // Returns the current envelope value in [0, 1].
-    float process(float sampleTime, bool gate) {
+    float process(float sampleTime, bool gate, float attackLambda, float releaseLambda) {
         float target = gate ? (1.f + TARGET_OVERSHOOT) : -TARGET_OVERSHOOT;
         float lambda = (target > out) ? attackLambda : releaseLambda;
         float y = out + (target - out) * lambda * sampleTime;

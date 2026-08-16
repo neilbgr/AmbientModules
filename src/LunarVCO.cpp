@@ -47,7 +47,11 @@ struct LunarVCO : Module {
         NUM_LIGHTS
     };
 
-    LunarVCOCore vco[PORT_MAX_CHANNELS];
+    // One LunarVCOCore instance handles 4 poly channels at once (SIMD) — see
+    // process() below. ADSREnvelope/gate stay scalar per channel: envelope
+    // stages can diverge per channel (asynchronous gates), and there's no
+    // sin/exp in that hot loop to vectorize (see ADSREnvelope.hpp).
+    LunarVCOCore vco[PORT_MAX_CHANNELS / 4];
     ADSREnvelope env[PORT_MAX_CHANNELS];
     dsp::SchmittTrigger gateTrigger[PORT_MAX_CHANNELS];
 
@@ -110,17 +114,27 @@ struct LunarVCO : Module {
         float shapeParam = params[SHAPE_PARAM].getValue();
         float shapeCvAtten = params[SHAPE_CV_ATTEN_PARAM].getValue();
         float fmCvAtten = params[FM_CV_ATTEN_PARAM].getValue();
-        float attack = params[ATTACK_PARAM].getValue();
-        float decay = params[DECAY_PARAM].getValue();
         float sustain = params[SUSTAIN_PARAM].getValue();
-        float release = params[RELEASE_PARAM].getValue();
+        // Attack/Decay/Release knobs are non-poly (same for every channel) —
+        // compute the lambdas once here instead of recomputing
+        // approxExp2_taylor5 per channel inside the loop below.
+        float attackLambda = ADSREnvelope::lambdaFromKnob(params[ATTACK_PARAM].getValue());
+        float decayLambda = ADSREnvelope::lambdaFromKnob(params[DECAY_PARAM].getValue());
+        float releaseLambda = ADSREnvelope::lambdaFromKnob(params[RELEASE_PARAM].getValue());
         bool envInputConnected = inputs[ENV_INPUT].isConnected();
         bool gateInputConnected = inputs[GATE_INPUT].isConnected();
+        bool vcoOutputConnected = outputs[VCO_OUTPUT].isConnected();
 
+        // Pass 1: envelopes are cheap scalar per-channel state (ADSREnvelope
+        // isn't vectorized — its stages can diverge per channel on
+        // asynchronous gates, see ADSREnvelope.hpp) — compute them all up
+        // front so Pass 2 can batch the VCO engine in groups of 4 channels
+        // and know per-group whether any lane actually needs it. Zero-filled
+        // so lanes past `channels` in the last partial group of 4 read 0
+        // (silent), never uninitialized memory.
+        float envValues[PORT_MAX_CHANNELS] = {};
         float maxEnvValue = 0.f;
         for (int c = 0; c < channels; c++) {
-            float pitch = tune + inputs[VOCT_INPUT].getPolyVoltage(c);
-
             float envValue;
             if (envInputConnected) {
                 envValue = clamp(inputs[ENV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
@@ -129,33 +143,37 @@ struct LunarVCO : Module {
                 bool gate = gateTrigger[c].isHigh();
                 // Priority: ENV input > Hold button > Gate input.
                 bool effectiveGate = hold || (gateInputConnected && gate);
-                envValue = env[c].process(args.sampleTime, effectiveGate, selfGen, attack, decay, sustain, release);
+                envValue = env[c].process(args.sampleTime, effectiveGate, selfGen, attackLambda, decayLambda, sustain, releaseLambda);
             }
+            envValues[c] = envValue;
             maxEnvValue = std::max(maxEnvValue, envValue);
+        }
 
-            // Voice silent (envValue == 0, reliable once STAGE_IDLE/SUSTAIN
-            // settle — see ADSREnvelope) or VCO_OUTPUT not patched: output
-            // would be zero/unheard anyway, skip the AS3340-style oscillator
-            // engine entirely (same idea as Lunar50Drone). In poly, this is
-            // what keeps released/idle voices cheap. Effectively a no-op
-            // whenever selfGen keeps envValue away from exactly zero, or an
-            // external ENV_INPUT never touches exactly 0V — worst case falls
-            // back to today's per-sample cost, never worse.
-            float dry = 0.f;
-            if (envValue > 0.f && outputs[VCO_OUTPUT].isConnected()) {
-                float fmCv = inputs[FM_INPUT].getPolyVoltage(c) * fmCvAtten;
-                float expFm = expMode ? fmCv : 0.f;
-                float linFm = expMode ? 0.f : fmCv * 100.f; // Hz scale, adjustable by ear
+        // Pass 2: VCO engine, 4 channels (1 SIMD group) at a time.
+        for (int base = 0; base < channels; base += 4) {
+            simd::float_4 envValue4 = simd::float_4::load(&envValues[base]);
 
-                float shape = clamp(shapeParam
-                    + inputs[SHAPE_CV_INPUT].getPolyVoltage(c) / 10.f * shapeCvAtten, 0.f, 1.f);
+            // Group silent (all 4 lanes' envelope at 0, reliable once
+            // STAGE_IDLE/SUSTAIN settle — see ADSREnvelope) or VCO_OUTPUT not
+            // patched: skip the AS3340-style oscillator engine for the whole
+            // group of 4 (same idea as the old per-channel skip, just at
+            // group granularity — see plan notes on this tradeoff).
+            simd::float_4 dry4 = simd::float_4::zero();
+            if (vcoOutputConnected && simd::movemask(envValue4 > 0.f) != 0) {
+                simd::float_4 pitch4 = tune + inputs[VOCT_INPUT].getPolyVoltageSimd<simd::float_4>(base);
+                simd::float_4 fmCv4 = inputs[FM_INPUT].getPolyVoltageSimd<simd::float_4>(base) * fmCvAtten;
+                simd::float_4 expFm4 = expMode ? fmCv4 : simd::float_4::zero();
+                simd::float_4 linFm4 = expMode ? simd::float_4::zero() : fmCv4 * 100.f; // Hz scale, adjustable by ear
 
-                dry = vco[c].process(args.sampleTime, args.sampleRate, pitch, expFm, linFm,
-                    waveform, shape, octaveOn, subOscOn, inputs[SYNC_INPUT].getPolyVoltage(c));
+                simd::float_4 shape4 = simd::clamp(shapeParam
+                    + inputs[SHAPE_CV_INPUT].getPolyVoltageSimd<simd::float_4>(base) / 10.f * shapeCvAtten, 0.f, 1.f);
+
+                dry4 = vco[base / 4].process(args.sampleTime, args.sampleRate, pitch4, expFm4, linFm4,
+                    waveform, shape4, octaveOn, subOscOn, inputs[SYNC_INPUT].getPolyVoltageSimd<simd::float_4>(base));
             }
 
-            outputs[VCO_OUTPUT].setVoltage(dry * 5.f * envValue, c);
-            outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
+            outputs[VCO_OUTPUT].setVoltageSimd(dry4 * 5.f * envValue4, base);
+            outputs[ENV_OUTPUT].setVoltageSimd(envValue4 * 10.f, base);
         }
         outputs[VCO_OUTPUT].setChannels(channels);
         outputs[ENV_OUTPUT].setChannels(channels);

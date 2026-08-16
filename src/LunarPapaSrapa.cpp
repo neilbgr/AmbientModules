@@ -82,7 +82,9 @@ struct LunarPapaSrapa : Module {
         NUM_LIGHTS
     };
 
-    PapaSrapaCore core[PORT_MAX_CHANNELS];
+    // One PapaSrapaCore instance handles 4 poly channels at once (SIMD) —
+    // see process() below.
+    PapaSrapaCore core[PORT_MAX_CHANNELS / 4];
     // The internal LFO/modulator is always monophonic (see process()) — a
     // single instance shared by every poly channel's FM/AM and by the
     // (mono) LFO_OUTPUT.
@@ -167,8 +169,11 @@ struct LunarPapaSrapa : Module {
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
         bool envInputConnected = inputs[ENV_INPUT].isConnected();
         bool gateInputConnected = inputs[GATE_INPUT].isConnected();
-        float attack = params[ATTACK_PARAM].getValue();
-        float release = params[RELEASE_PARAM].getValue();
+        // Attack/Release knobs are non-poly (same for every channel) — compute
+        // the lambdas once here instead of recomputing approxExp2_taylor5
+        // per channel inside the loop below.
+        float attackLambda = AREnvelope::lambdaFromKnob(params[ATTACK_PARAM].getValue());
+        float releaseLambda = AREnvelope::lambdaFromKnob(params[RELEASE_PARAM].getValue());
 
         bool lfoOutputConnected = outputs[LFO_OUTPUT].isConnected();
         bool vcoOutputConnected = outputs[VCO_OUT].isConnected();
@@ -190,9 +195,11 @@ struct LunarPapaSrapa : Module {
 
         // Pass 1: envelopes are cheap (no std::exp) — compute them all up
         // front so we know whether ANY channel needs the expensive
-        // oscillator engine before deciding whether to run the mod.
-        float envValues[PORT_MAX_CHANNELS];
-        float envAmounts[PORT_MAX_CHANNELS];
+        // oscillator engine before deciding whether to run the mod. Zero-
+        // filled so lanes past `channels` in the last partial group of 4
+        // (Pass 2 below) read 0 (silent), never uninitialized memory.
+        float envValues[PORT_MAX_CHANNELS] = {};
+        float envAmounts[PORT_MAX_CHANNELS] = {};
         bool anyComputeAudio = false;
         for (int c = 0; c < channels; c++) {
             float envValue;
@@ -201,8 +208,7 @@ struct LunarPapaSrapa : Module {
             } else {
                 gateTrigger[c].process(inputs[GATE_INPUT].getPolyVoltage(c));
                 bool gateHigh = holdActive || (gateInputConnected && gateTrigger[c].isHigh());
-                envelope[c].updateCoefficients(attack, release);
-                envValue = envelope[c].process(args.sampleTime, gateHigh);
+                envValue = envelope[c].process(args.sampleTime, gateHigh, attackLambda, releaseLambda);
             }
             envValues[c] = envValue;
             float envAmount = clamp(envValue, 0.f, 1.f);
@@ -242,23 +248,30 @@ struct LunarPapaSrapa : Module {
 
         float maxEnvValue = 0.f;
         for (int c = 0; c < channels; c++) {
-            float pitchOctaves = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getPolyVoltage(c);
+            maxEnvValue = std::max(maxEnvValue, envAmounts[c]);
+        }
 
-            float envValue = envValues[c];
-            float envAmount = envAmounts[c];
-            maxEnvValue = std::max(maxEnvValue, envAmount);
+        // Pass 2: VCO engine, 4 channels (1 SIMD group) at a time.
+        for (int base = 0; base < channels; base += 4) {
+            simd::float_4 pitchOctaves4 = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getPolyVoltageSimd<simd::float_4>(base);
+            simd::float_4 envValue4 = simd::float_4::load(&envValues[base]);
+            simd::float_4 envAmount4 = simd::float_4::load(&envAmounts[base]);
 
             // VCO_OUT is enveloped, so its audio oscillator is only computed
-            // when patched AND the envelope is above 0 (silent otherwise,
-            // same idea as Lunar50Drone).
-            bool computeAudio = vcoOutputConnected && envAmount > 0.f;
+            // when patched AND at least one lane's envelope is above 0
+            // (whole group silent otherwise, same idea as Lunar50Drone) —
+            // group-level skip instead of the old per-channel one (see
+            // PapaSrapaCore.hpp), since a SIMD group can't skip individual
+            // lanes cheaply; correctness is unaffected either way since the
+            // final output below is scaled by each lane's own envAmount.
+            simd::float_4 vco4 = simd::float_4::zero();
+            if (vcoOutputConnected && simd::movemask(envAmount4 > 0.f) != 0) {
+                vco4 = core[base / 4].process(args.sampleTime, args.sampleRate, pitchOctaves4,
+                    modSquare, modAmount, mode, noiseSample, noiseAmount, noiseOnly);
+            }
 
-            float vco = core[c].process(args.sampleTime, args.sampleRate, pitchOctaves,
-                modSquare, modAmount, mode, noiseSample, noiseAmount, noiseOnly,
-                computeAudio);
-
-            outputs[VCO_OUT].setVoltage(vco * OUTPUT_VOLTAGE * envAmount, c);
-            outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
+            outputs[VCO_OUT].setVoltageSimd(vco4 * OUTPUT_VOLTAGE * envAmount4, base);
+            outputs[ENV_OUTPUT].setVoltageSimd(envValue4 * 10.f, base);
         }
 
         outputs[VCO_OUT].setChannels(channels);

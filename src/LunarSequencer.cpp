@@ -80,9 +80,13 @@ struct LunarSequencer : Module {
 
     static constexpr float RATE_MIN_OCT = -4.3219f; // 0.05 Hz (20 s/step)
     static constexpr float RATE_MAX_OCT = 6.f;
+    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
+    // representable in float, and a compile-time literal removes any
+    // dependency on the compiler actually folding a runtime powf call.
+    static constexpr float TWO_POW_30 = 1073741824.f;
 
     static float octavesToHz(float octaves) {
-        return dsp::approxExp2_taylor5(octaves + 30.f) / std::pow(2.f, 30.f);
+        return dsp::approxExp2_taylor5(octaves + 30.f) / TWO_POW_30;
     }
 
     static constexpr float cvRanges[4][2] = { {0.f, 5.f}, {0.f, 10.f}, {-5.f, 5.f}, {-10.f, 10.f} };
