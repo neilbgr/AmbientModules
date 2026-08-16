@@ -38,6 +38,15 @@ struct LunarPapaSrapa : Module {
     static constexpr float RATE_CURVE_EXP = 0.6f; // <1: more knob travel near the top of the range
     static constexpr float PITCH_MIN_OCT = -4.f;      // C0 (~16.35 Hz)
     static constexpr float PITCH_MAX_OCT = 10.f / 3.f; // E7 (~2637 Hz), per solar42f_instruct_03_25_v9.pdf p.8
+    // MOD_PARAM's FM effect (fmDepth below, not AM's modAmount — AM tested
+    // fine linear) felt front-loaded compared to the real hardware: Neil
+    // found the real pot needs about half its travel to reach the same FM
+    // effect ours reached in its first ~2%. >1: more knob travel near the
+    // bottom of the range (opposite of RATE_CURVE_EXP above). 5.6 matched
+    // that ~2%-at-half-travel measurement exactly but felt too extreme by
+    // ear; backed off to 3.0 (knob position 0.5 lands on depth 0.125,
+    // position 1 still gives full depth).
+    static constexpr float MOD_CURVE_EXP = 3.0f;
 
     int theme = 0;
 
@@ -185,6 +194,11 @@ struct LunarPapaSrapa : Module {
         // patched into either only affects the shared modulator through its
         // first channel, matching the real hardware's single LFO per module.
         float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getPolyVoltage(0) / 10.f, 0.f, 1.f);
+        // FM only: AM tested fine with the linear knob, only FM felt
+        // front-loaded against the real hardware (see MOD_CURVE_EXP above) —
+        // so the curve applies to fmDepth alone, not to modAmount (still used
+        // as-is for AM's amGain below).
+        float fmDepth = std::pow(modAmount, MOD_CURVE_EXP);
         float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getPolyVoltage(0) / 10.f, 0.f, 1.f);
 
         // Poly channel count driven by CV, gate, AND the envelope input, so
@@ -267,7 +281,7 @@ struct LunarPapaSrapa : Module {
             simd::float_4 vco4 = simd::float_4::zero();
             if (vcoOutputConnected && simd::movemask(envAmount4 > 0.f) != 0) {
                 vco4 = core[base / 4].process(args.sampleTime, args.sampleRate, pitchOctaves4,
-                    modSquare, modAmount, mode, noiseSample, noiseAmount, noiseOnly);
+                    modSquare, modAmount, fmDepth, mode, noiseSample, noiseAmount, noiseOnly);
             }
 
             outputs[VCO_OUT].setVoltageSimd(vco4 * OUTPUT_VOLTAGE * envAmount4, base);

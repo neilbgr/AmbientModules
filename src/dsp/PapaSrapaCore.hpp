@@ -205,7 +205,10 @@ struct PapaSrapaCore {
     // idiom as LunarVCOCore/DroneVoice), per channel. modSquare: the shared
     // modulator's current output (see PapaSrapaModulator), used for FM/AM —
     // module-wide, same for every channel in this group. modDepth: 0..1,
-    // FM/AM modulation depth — module-wide. modMode: which of FM/AM (or
+    // AM modulation depth — module-wide. fmDepth: 0..1, FM modulation depth —
+    // module-wide; a separate knob-curve from modDepth (see LunarPapaSrapa's
+    // MOD_CURVE_EXP — FM alone felt front-loaded against the real hardware,
+    // AM tested fine with the linear knob). modMode: which of FM/AM (or
     // both/neither) is active — module-wide. noiseSample: the shared
     // white-noise source's current sample (see LunarPapaSrapa.cpp), mixed
     // in at noiseAmount (0..1) — both module-wide. noiseOnly: bypasses the
@@ -217,7 +220,7 @@ struct PapaSrapaCore {
     // is therefore the caller's job now, not this struct's.
     // Returns the mixed output in roughly [-1, 1], one lane per channel.
     simd::float_4 process(float sampleTime, float sampleRate, simd::float_4 pitchOctaves,
-                           float modSquare, float modDepth, ModMode modMode,
+                           float modSquare, float modDepth, float fmDepth, ModMode modMode,
                            float noiseSample, float noiseAmount, bool noiseOnly) {
         if (noiseOnly)
             return simd::float_4(noiseSample);
@@ -231,7 +234,7 @@ struct PapaSrapaCore {
         bool fmOn = (modMode == MODE_FM || modMode == MODE_FM_AM);
         bool amOn = (modMode == MODE_AM || modMode == MODE_FM_AM);
 
-        float fmOctaves = fmOn ? modSquare * modDepth * 2.f : 0.f; // up to +-2 octaves
+        float fmOctaves = fmOn ? modSquare * fmDepth * 2.f : 0.f; // up to +-2 octaves
         simd::float_4 audioFreq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitchOctaves + fmOctaves + 30.f) / TWO_POW_30;
         audioFreq = simd::clamp(audioFreq, 0.f, sampleRate / 2.f);
 
