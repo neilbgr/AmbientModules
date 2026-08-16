@@ -17,6 +17,27 @@ using namespace rack;
 // — stays constant across the whole pitch range. Values below are a
 // starting point tuned by ear against that recording (idiomatic
 // approximation, not a literal circuit emulation).
+//
+// A second, full-audible-range sweep capture (wave/PapaSrapa.wav) revealed
+// two effects the corner-shape model above doesn't cover on its own —
+// duty cycle isn't fixed at 50/50, and overall swing isn't frequency-
+// independent:
+//   - Hysteresis-based edge detection on that sweep (needed because naive
+//     zero-crossing is swamped by the real oscillator's chaotic ripple —
+//     see PapaSrapaCore's own doc comment) measured duty cycle going from
+//     ~80/20 high/low around 26 Hz, to ~71/29 around 330 Hz, converging
+//     toward ~50/50 above a few kHz.
+//   - The same measurement showed overall swing collapsing from near-full-
+//     scale below ~50 Hz to only a few % of full scale above ~10 kHz —
+//     the real VCO running out of slew time at high pitch.
+// DUTY_ASYM_* and AMP_FALLOFF_FC below model those two effects as cheap
+// additions on top of the existing corner shape (which stays exactly as
+// tuned): a phase-flip threshold that decays from 0.5+DUTY_ASYM_DEPTH down
+// to 0.5 (one exp(), same family as the one already spent on slowTau below),
+// and a one-pole-style rational amplitude rolloff vs. freq (one division,
+// no extra transcendental). Both fit against the two hardware sample points
+// Neil asked to check (samples 72942 and 474879) plus the aggregate trend
+// across the full sweep.
 namespace PapaSrapaRamp {
     constexpr float FAST_TAU = 0.00007f;     // ~70us: fast flip
     constexpr float SLOW_TAU_PERIODS = 1.5f; // sustained ramp, in periods
@@ -30,6 +51,18 @@ namespace PapaSrapaRamp {
     // decorative — without blunting the fast component's speed (its tau is
     // well under FAST_TAU, so it only softens the kink itself).
     constexpr float SMOOTH_TAU = 0.00002f; // ~20us
+
+    // Duty-cycle asymmetry (see file header): phase-flip threshold is
+    // 0.5 + DUTY_ASYM_DEPTH * exp(freq * DUTY_ASYM_NEG_INV_F0), i.e. it decays
+    // from 0.5+DEPTH at freq->0 toward 0.5 as freq grows, following a
+    // measured "F0-ish" characteristic decay frequency.
+    constexpr float DUTY_ASYM_DEPTH = 0.32f;
+    constexpr float DUTY_ASYM_NEG_INV_F0 = -1.f / 720.f; // -1/F0, F0 ~= 720 Hz
+
+    // Amplitude falloff vs. freq (see file header): a one-pole-style rational
+    // rolloff, AMP_FALLOFF_FC / (AMP_FALLOFF_FC + freq) -- ~unity well below
+    // AMP_FALLOFF_FC, halved at freq == AMP_FALLOFF_FC, decaying further above it.
+    constexpr float AMP_FALLOFF_FC = 235.f; // Hz
 
     // shape() below is templated to work both scalar (T=float, used by the
     // mono PapaSrapaModulator) and 4-wide SIMD (T=simd::float_4, used by
@@ -50,7 +83,19 @@ namespace PapaSrapaRamp {
     template <typename T>
     inline T shape(T& fast, T& slow, T& smooth, T phase, T freq,
                     float sampleTime, float fastCoef, float smoothCoef) {
-        T target = simd::ifelse(phase < 0.5f, T(1.f), T(-1.f));
+        T dutyThreshold = 0.5f + DUTY_ASYM_DEPTH * rampExp(freq * DUTY_ASYM_NEG_INV_F0);
+        // An asymmetric duty cycle needs asymmetric target LEVELS too, not just
+        // an asymmetric time split -- spending most of the period near +1 and
+        // only a brief moment near -1 would drag the average output well above
+        // 0. Scaling the two targets so dutyThreshold*highTarget +
+        // (1-dutyThreshold)*lowTarget == 0 keeps each cycle charge-balanced
+        // (zero DC) at any duty ratio, and collapses back to the original +-1
+        // targets when dutyThreshold == 0.5 (mid/high freq, unchanged from
+        // before). Matches the measured shape too: a shallow high plateau
+        // paired with a deep, brief low excursion, not the other way round.
+        T highTarget = (1.f - dutyThreshold) * 2.f;
+        T lowTarget = dutyThreshold * -2.f;
+        T target = simd::ifelse(phase < dutyThreshold, highTarget, lowTarget);
         fast += (target - fast) * fastCoef;
 
         T period = 1.f / rampMax(freq, T(1e-6f));
@@ -59,7 +104,9 @@ namespace PapaSrapaRamp {
 
         T blended = rampClamp((MIX * fast + (1.f - MIX) * slow) * MAKEUP_GAIN, T(-1.f), T(1.f));
         smooth += (blended - smooth) * smoothCoef;
-        return smooth;
+
+        T ampScale = AMP_FALLOFF_FC / (AMP_FALLOFF_FC + freq);
+        return smooth * ampScale;
     }
 }
 
