@@ -1,6 +1,6 @@
 # Manual screenshots
 
-Screenshots referenced by `../../MANUAL.md`:
+Screenshots referenced by `../../README.md`:
 
 - One panel PNG per module, Cream theme: `Lunar50Drone.png`, `LunarVCO.png`, `LunarLFO.png`, `LunarPapaSrapa.png`, `LunarSequencer.png`, `Blank.png`.
 - Shared "Theme" context-menu screenshot: `Menu_Themes.png`.
