@@ -192,7 +192,12 @@ struct PapaSrapaCore {
         audioPhase -= simd::floor(audioPhase);
         simd::float_4 audioSquare = PapaSrapaRamp::shape(audioFast, audioSlow, audioSmooth, audioPhase, audioFreq, sampleTime, fastCoef, smoothCoef);
 
-        float amGain = amOn ? (0.5f + 0.5f * modDepth * modSquare) : 1.f;
+        // At modDepth == 0 this must reduce to unity gain (AM effectively
+        // off, passthrough level) — interpolate from unity (depth 0) down to
+        // the full-depth AM curve (depth 1, 0.5 + 0.5*modSquare, unchanged
+        // from before) rather than starting from a fixed 0.5 baseline that
+        // used to halve the output even at zero depth.
+        float amGain = amOn ? (1.f - modDepth * 0.5f * (1.f - modSquare)) : 1.f;
         simd::float_4 out = audioSquare * amGain;
         out += noiseSample * noiseAmount;
 
