@@ -4,6 +4,7 @@
   "version": "2.0.0",
   "license": "GPL-3.0-or-later",
   "brand": "AmbientModules",
+  "description": "A small collection of Rack modules inspired by Elta Music's SOLAR 42F ambient drone synthesizer.",
   "author": "Neil Baumberger",
   "authorEmail": "neilbgr8@gmail.com",
   "authorUrl": "https://github.com/neilbgr",
