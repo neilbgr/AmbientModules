@@ -10,43 +10,51 @@ struct StepCvQuantity : ParamQuantity {
     std::string getDisplayValueString() override;
 };
 
-// Rack's stock Switch (base of every CKSS*) wraps straight from max back to
-// min on click. A real 3-position toggle can't skip past its middle
-// position like that — it has to pass back through it — so this bounces
-// direction at each end instead of wrapping. Templated on the underlying
-// SvgSwitch so both orientations (vertical/horizontal) share one behavior.
+// A real 3-position toggle snaps to whichever side of the lever you push,
+// rather than bumping one step per click like Rack's stock Switch. So instead
+// of reacting to onDragStart (which has no click position), this reads the
+// click's position within the widget on mouse-down and jumps straight to the
+// third (top/middle/bottom, or left/middle/right) it falls in. onDragStart is
+// neutralized so the base Switch's step-and-wrap logic can't fight it on the
+// same click. Templated on the underlying SvgSwitch so both orientations
+// share one behavior.
 template <typename TBase>
-struct BounceSwitch : TBase {
-    int direction = 1;
-
-    void onDragStart(const widget::Widget::DragStartEvent& e) override {
-        ParamWidget::onDragStart(e);
-        if (e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+struct ClickTargetSwitch : TBase {
+    void onButton(const widget::Widget::ButtonEvent& e) override {
+        TBase::onButton(e);
+        if (e.action != GLFW_PRESS || e.button != GLFW_MOUSE_BUTTON_LEFT) return;
 
         engine::ParamQuantity* pq = this->getParamQuantity();
         if (!pq) return;
 
+        // CKSSThreeHorizontal is wider than tall, CKSSThree the opposite.
+        bool horizontal = this->box.size.x > this->box.size.y;
+        float frac = horizontal ? e.pos.x / this->box.size.x : e.pos.y / this->box.size.y;
+        frac = clamp(frac, 0.f, 1.f);
+        // Vertical: value 0 is at the bottom (see STAGES_PARAM comment below),
+        // so flip so frac still runs low-to-high with the value.
+        if (!horizontal) frac = 1.f - frac;
+
         float oldValue = pq->getValue();
-        float newValue = std::round(oldValue) + direction;
-        if (newValue > pq->getMaxValue() || newValue < pq->getMinValue()) {
-            direction = -direction;
-            newValue = std::round(oldValue) + direction;
-        }
+        float newValue = (frac < 1.f / 3.f) ? 0.f : (frac < 2.f / 3.f) ? 1.f : 2.f;
+        if (newValue == oldValue) return;
         pq->setValue(newValue);
 
-        if (oldValue != newValue) {
-            history::ParamChange* h = new history::ParamChange;
-            h->name = "move switch";
-            h->moduleId = this->module->id;
-            h->paramId = this->paramId;
-            h->oldValue = oldValue;
-            h->newValue = newValue;
-            APP->history->push(h);
-        }
+        history::ParamChange* h = new history::ParamChange;
+        h->name = "move switch";
+        h->moduleId = this->module->id;
+        h->paramId = this->paramId;
+        h->oldValue = oldValue;
+        h->newValue = newValue;
+        APP->history->push(h);
+    }
+
+    void onDragStart(const widget::Widget::DragStartEvent& e) override {
+        ParamWidget::onDragStart(e);
     }
 };
-using BounceCKSSThree = BounceSwitch<CKSSThree>;
-using BounceCKSSThreeHorizontal = BounceSwitch<CKSSThreeHorizontal>;
+using ClickTargetCKSSThree = ClickTargetSwitch<CKSSThree>;
+using ClickTargetCKSSThreeHorizontal = ClickTargetSwitch<CKSSThreeHorizontal>;
 
 struct LunarSequencer : Module {
     static const int NUM_STEPS = 5;
@@ -225,7 +233,7 @@ struct LunarSequencerWidget : ModuleWidget, ThemedModuleWidget {
 
         //addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xC, 50.f)), module, LunarSequencer::RESET_INPUT));
 
-        addParam(createParamCentered<BounceCKSSThreeHorizontal>(mm2px(Vec(xC, 44.5f)), module, LunarSequencer::STAGES_PARAM));
+        addParam(createParamCentered<ClickTargetCKSSThreeHorizontal>(mm2px(Vec(xC, 44.5f)), module, LunarSequencer::STAGES_PARAM));
 
         //const float lightX[LunarSequencer::NUM_STEPS] = {5.36f, 10.30f, 15.24f, 20.18f, 25.12f};           
 

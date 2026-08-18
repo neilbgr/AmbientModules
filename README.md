@@ -219,7 +219,7 @@ A classic, Buchla-inspired 5-stage sequential voltage source: each step stores i
 
 **Knobs & switches**
 - **Pulser rate** — speed of the internal clock, used whenever nothing is patched into Clock In.
-- **Stages** — sets the sequence length to 3, 4, or 5 steps. ⚠️ Following the original SOLAR 42F hardware switch, the physical positions read (top to bottom) 4, 5, 3 rather than the more intuitive 3, 4, 5.
+- **Stages** — sets the sequence length to 3, 4, or 5 steps. ⚠️ Following the original SOLAR 42F hardware switch, the physical positions read (top to bottom) 4, 5, 3 rather than the more intuitive 3, 4, 5. Click directly on the side you want (rather than the current lever position) to jump straight there, like a real toggle switch.
 - **Step 1–5 CV** — each step's output level; the knob's tooltip shows the actual voltage for the currently selected CV Range.
 - **Step 1–5 gate** (lit button) — enables/disables that step's Gate output. This does **not** affect the CV output — a "gate off" step is skipped for triggering, but its CV value still plays when the sequence reaches it.
 
