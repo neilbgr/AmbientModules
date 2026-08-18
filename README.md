@@ -2,17 +2,20 @@
 
 **AmbientModules** is a small collection of VCV Rack / Cardinal modules inspired by the [Elta Music](https://www.eltamusic.com) [ **SOLAR 42F** "Ambient Drone Machine"](https://www.eltamusic.com/solar-42f)  — an analogue microtonal drone synthesizer. Rather than reproducing the SOLAR 42F's fixed hardware layout, each of its sound engines is broken out here into an independent, freely-patchable Rack module:
 
+![All AmbientModules panels, Cream theme](docs/images/AllModules_Cream.png)
+
 | Module                            | What it does                                       | SOLAR 42F equivalent                       |
 |-----------------------------------|----------------------------------------------------|--------------------------------------------|
+| [Blank](#blank)                   | Blank panel                                        | —                                          |
 | [Lunar50Drone](#lunar50drone)     | 5-oscillator sawtooth drone with a shared envelope | Drone voices 1, 2, 4, 5 "Classic Solar 50" |
 | [LunarVCO](#lunarvco)             | AS3340-style VCO with ADSR and hard sync           | Voices "VCO A / VCO B"                     |
-| [LunarLFO](#lunarlfo)             | Dual unipolar triangle/square LFO                  | LFOs                                       |
 | [LunarPapaSrapa](#lunarpapasrapa) | FM/AM cross-modulated noise/drone voice            | Drone voices 3, 6 "Papa Srapa"             |
+| [LunarLFO](#lunarlfo)             | Dual unipolar triangle/square LFO                  | LFOs                                       |
 | [LunarSequencer](#lunarsequencer) | 5-stage Buchla-inspired CV/gate sequencer          | Sequencer                                  |
-| [Blank](#blank)                   | Blank panel                                        | —                                          |
 
 ## Table of Contents
 
+- [Videos](#videos)
 - [Panel themes](#panel-themes)
 - [Right-click menu](#right-click-menu)
 - [Shared conventions](#shared-conventions)
@@ -22,6 +25,11 @@
 - [LunarPapaSrapa](#lunarpapasrapa)
 - [LunarSequencer](#lunarsequencer)
 - [Blank](#blank)
+
+## Videos
+
+- [Lunar 42 VCV Rack modules - Cinematic performance](https://youtu.be/Ja0lZwwcWLM) — a live patch using Lunar50Drone, LunarVCO, and LunarLFO; inspired by [JayHosking's original "Solar 42F synth - Cinematic performance"](https://www.youtube.com/watch?v=wQyHPJ56aNg).
+- [Lunar 42 VCV Rack modules - Cinematic Ambient](https://youtu.be/l4NEwDLc4YI) — a live patch using Lunar50Drone, LunarVCO, LunarLFO, and LunarSequencer; inspired by [JayHosking's original "Cinematic Ambient (part 1)"](https://www.youtube.com/watch?v=45tY-e7fdm4).
 
 ## Panel themes
 
