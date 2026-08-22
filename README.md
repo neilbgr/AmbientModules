@@ -33,7 +33,7 @@
 
 ## Panel themes
 
-Every AmbientModules panel is available in 5 color themes: **Cream** (default — used for every screenshot in this manual), **Black**, **Pink**, **Yellow**, and **Blue**. Change a module's theme from its right-click menu (see below).
+Every AmbientModules panel is available in 5 color themes: **Cream** (default — used for every screenshot in this manual), **Black**, **Pink**, **Yellow**, and **Blue**. Theme is a single pack-wide setting, not per-module: changing it from any one module's right-click menu (see below) instantly re-themes every AmbientModules module already in the patch, and every new one you add afterward starts in that same theme too — it's remembered between sessions.
 
 The full rack of AmbientModules modules, side by side, in each of the 5 available themes:
 
@@ -59,10 +59,9 @@ The full rack of AmbientModules modules, side by side, in each of the 5 availabl
 
 ## Right-click menu
 
-Right-click any AmbientModules module to open its context menu. Two entries are identical across all 6 modules:
+Right-click any AmbientModules module to open its context menu. One entry is identical across all 6 modules:
 
-- **Theme** — a submenu to switch that module's panel between Cream / Black / Pink / Yellow / Blue.
-- **Apply theme to all AmbientModules** — instantly re-themes every AmbientModules module currently in the patch to match the one you right-clicked, in a single undo step.
+- **Theme** — a submenu to switch the pack-wide panel theme between Cream / Black / Pink / Yellow / Blue (see [Panel themes](#panel-themes) above — it's not specific to the module you right-clicked).
 
 ![Theme submenu](docs/images/Menu_Themes.png)
 
@@ -73,7 +72,7 @@ Some modules add extra entries of their own — those are documented under the m
 A few behaviors repeat across several modules and are only explained here:
 
 - **V/OCT.** Pitch inputs follow the standard 1 volt per octave convention (0V = C4), like any other Rack oscillator.
-- **Polyphony.** Lunar50Drone, LunarVCO, and LunarPapaSrapa are polyphonic: they follow the channel count of their main CV/Gate inputs, or of the Envelope CV input, whichever is highest — so patching a polyphonic V/OCT or Gate signal (from a polyphonic sequencer, MIDI-to-CV, etc.), or chaining another module's polyphonic Envelope output into Envelope CV, drives independent voices per channel.
+- **Polyphony.** Lunar50Drone, LunarVCO, and LunarPapaSrapa are polyphonic: every CV input on their main panel (not just V/OCT/Gate — also Volt CV on Lunar50Drone, FM/Shape CV/Sync on LunarVCO, Modulation depth CV/Divider CV on LunarPapaSrapa) is read independently per channel, and the module's channel count follows whichever of them carries the most channels, or the Envelope CV input if that's higher still. So patching a polyphonic V/OCT or Gate signal (from a polyphonic sequencer, MIDI-to-CV, etc.) anywhere among those inputs, or chaining another module's polyphonic Envelope output into Envelope CV, drives independent voices per channel throughout the module.
 - **Envelope CV override.** Lunar50Drone, LunarVCO, and LunarPapaSrapa each have an **Envelope CV** input. When it's patched, it completely replaces that module's internal envelope, its Gate input, and its Hold switch — handy for driving several of these modules from one shared envelope so their amplitudes stay locked together.
 - **Hold.** Also shared by those same three modules: a **Hold** switch that, when engaged, forces the envelope open permanently (an "always on" drone) — same effect as holding the Gate input high, and the same switch is overridden the moment the Envelope CV input is patched.
 
@@ -85,17 +84,17 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 
 **Knobs & switches**
 - **Oscillator 1–5 frequency** — one knob per oscillator, octave-linear tuning centered on C4.
-- **Oscillator 1–5 active** (lit button) — mutes/unmutes that oscillator. Can also be toggled from the corresponding trigger input.
+- **Oscillator 1–5 active** (lit button) — mutes/unmutes that oscillator. Can also be toggled from the corresponding trigger input. Not polyphonic: it's a single on/off state per oscillator, shared identically by every poly channel — there's no per-channel "active" state.
 - **Oscillator 1–5 modulation** (lit button) — enables that oscillator's contribution to the cross-modulation described below.
-- **CV Attenuverter** — scales the incoming Frequency CV (±100%) before it's applied to all 5 oscillators together, so it shifts their combined pitch while preserving the intervals between them.
-- **Volt** — transposes all 5 oscillators down together; past roughly the halfway point of the knob's travel, they also start frequency-modulating each other (see [Context menu](#lunar50drone-context-menu) for how that cross-modulation is wired), for the same FM synthesis effect described in the original SOLAR 42F documentation.
+- **CV Attenuverter** — scales the incoming Frequency CV (±100%, defaults to +100%) before it's applied to all 5 oscillators together, so it shifts their combined pitch while preserving the intervals between them. ⚠️ Following the real SOLAR 42F, an oscillator only responds to Frequency CV once its own **Modulation** button is enabled — with the attenuverter at its default +100%, enabling Modulation on an oscillator is normally enough on its own; turn the attenuverter down (or all the way to 0%) if you want to reduce or fully disable Frequency CV's effect on every oscillator at once. This gating-by-Modulation-button is by design, not a bug: it mirrors the original hardware's per-oscillator "modulation enable" switch.
+- **Volt** — transposes all 5 oscillators down together, independently of the Modulation buttons/CV Attenuverter above; past roughly the halfway point of the knob's travel, they also start frequency-modulating each other (see [Context menu](#lunar50drone-context-menu) for how that cross-modulation is wired), for the same FM synthesis effect described in the original SOLAR 42F documentation.
 - **Attack / Release** — the shared envelope applied to the mix.
 - **Hold** (lit button) — see [Shared conventions](#shared-conventions).
 
 **Inputs**
 - **Frequency CV** — sums (through the CV Attenuverter) onto all 5 oscillators at once.
-- **Oscillator 1–5 trigger** — toggles the corresponding oscillator's Active state on a rising edge.
-- **Volt CV** — 0–10V, adds to the Volt knob.
+- **Oscillator 1–5 trigger** — toggles the corresponding oscillator's Active state on a rising edge. Monophonic (channel 1 only, even from a polyphonic cable) — matches the Active button it drives, which isn't per-channel either.
+- **Volt CV** — 0–10V, adds to the Volt knob; polyphonic, read independently per channel.
 - **Gate** — opens the shared envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 - **Envelope CV** — see [Shared conventions](#shared-conventions).
 
@@ -199,21 +198,21 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 
 **Inputs**
 - **Pitch CV** — 1V/oct, sums onto the Pitch knob.
-- **Modulation depth CV**, **Divider CV** — sum onto their respective knobs. Monophonic: only channel 1 is read, even from a polyphonic cable — the internal modulator is a single shared LFO, not one per voice (see LFO output below).
-- **Sample & hold clock** — samples a new value on each rising edge. Monophonic (channel 1 only).
-- **Sample & hold input** — the source to sample; normalled to the internal noise generator when nothing is patched here. Monophonic (channel 1 only).
+- **Modulation depth CV**, **Divider CV** — sum onto their respective knobs; polyphonic, read independently per channel, each driving its own per-channel modulator (see LFO output below) — so different channels can have their own FM/AM depth and modulator rate.
+- **Sample & hold clock** — samples a new value on each rising edge; polyphonic, with its own channel count driven by Sample & hold clock/input (independent from the rest of the panel — see Outputs below).
+- **Sample & hold input** — the source to sample; normalled to the internal noise generator when nothing is patched here; polyphonic, same channel count as Sample & hold clock.
 - **Gate** — opens the envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 - **Envelope CV** — see [Shared conventions](#shared-conventions).
 
 **Outputs**
 - **VCO (enveloped)** — the main cross-modulated/noise audio output, shaped by the envelope.
-- **LFO** — the raw low-frequency modulator signal, always running while patched. Monophonic — a single shared modulator drives FM/AM for every voice, matching the real hardware's one LFO per module.
-- **Sample & hold** — the current sampled value. Monophonic.
+- **LFO** — the raw low-frequency modulator signal, always running while patched; polyphonic — each channel gets its own independent modulator (see Modulation depth CV / Divider CV above), unlike the real hardware's single LFO per module.
+- **Sample & hold** — the current sampled value; polyphonic, with its own channel count driven by the Sample & hold Signal/Clock inputs — independent from Pitch CV/Gate/Envelope CV, since S&H is a self-contained section of the panel.
 - **Envelope** — 0–10V copy of the envelope currently shaping VCO Out.
 
 **LEDs**
 - **Envelope** (yellow, standalone) — brightness follows the envelope's current level.
-- **Sample & Hold** (blue, standalone) — flashes with each new sample, brightness proportional to the sampled value's magnitude.
+- **Sample & Hold** (blue, standalone) — flashes with each new sample on channel 1, brightness proportional to that channel's sampled value's magnitude (a single LED can't show all channels at once).
 
 **Patch ideas**
 - Turn on both FM and AM with a fast Rate and high Modulation depth for the "sirens and space monsters" sounds the original Papa Srapa circuit is known for.
