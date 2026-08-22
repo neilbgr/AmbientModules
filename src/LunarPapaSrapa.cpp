@@ -48,8 +48,6 @@ struct LunarPapaSrapa : Module {
     // position 1 still gives full depth).
     static constexpr float MOD_CURVE_EXP = 3.0f;
 
-    int theme = 0;
-
     enum ParamIds {
         RATE_PARAM,         // LFO rate, single knob from 1 Hz up to C4
         PITCH_PARAM,        // audio oscillator pitch, single knob spanning C0..E7
@@ -67,11 +65,11 @@ struct LunarPapaSrapa : Module {
     enum InputIds {
         GATE_INPUT,
         PITCH_CV_INPUT,     // 1V/oct, sums onto PITCH_PARAM
-        SH_CLOCK_INPUT,     // read from channel 0 only (S&H is monophonic)
-        SH_INPUT,           // sample & hold source, normalled to the internal noise; read from channel 0 only (S&H is monophonic)
+        SH_CLOCK_INPUT,     // its own channel count drives the S&H section (independent of the rest of the panel)
+        SH_INPUT,           // sample & hold source, normalled to the internal noise
         ENV_INPUT,
-        MOD_CV_INPUT,       // sums onto MOD_PARAM; read from channel 0 only (the internal LFO is monophonic)
-        DIVIDER_CV_INPUT,   // sums onto DIVIDER_PARAM; read from channel 0 only (the internal LFO is monophonic)
+        MOD_CV_INPUT,       // sums onto MOD_PARAM, per channel
+        DIVIDER_CV_INPUT,   // sums onto DIVIDER_PARAM, per channel
         NUM_INPUTS
     };
     enum OutputIds {
@@ -94,20 +92,22 @@ struct LunarPapaSrapa : Module {
     // One PapaSrapaCore instance handles 4 poly channels at once (SIMD) —
     // see process() below.
     PapaSrapaCore core[PORT_MAX_CHANNELS / 4];
-    // The internal LFO/modulator is always monophonic (see process()) — a
-    // single instance shared by every poly channel's FM/AM and by the
-    // (mono) LFO_OUTPUT.
-    PapaSrapaModulator modulator;
+    // One modulator per poly channel, since Modulation Depth and Divider are
+    // themselves polyphonic (see process()) — each channel gets its own
+    // LFO/FM-AM source and its own LFO_OUTPUT lane. Scalar loop, not SIMD:
+    // cheap enough that a plain per-channel loop isn't worth vectorizing.
+    PapaSrapaModulator modulator[PORT_MAX_CHANNELS];
     AREnvelope envelope[PORT_MAX_CHANNELS];
     dsp::SchmittTrigger gateTrigger[PORT_MAX_CHANNELS];
-    // Sample & hold is always monophonic too (one clock, one held value),
-    // same simplification as the LFO/modulator above. shNoiseState is its
-    // own PRNG state, decoupled from each voice's own noise generator (see
-    // PapaSrapaCore) — it only ever needs to advance on a clock edge, not
-    // continuously every sample.
-    dsp::SchmittTrigger shClockTrigger;
-    float shValue = 0.f;
-    uint32_t shNoiseState = 0x1234567u;
+    // S&H is a section independent from the rest of the panel, with its own
+    // channel count driven by Signal/Clock (see process()) — one trigger/held
+    // value/noise-PRNG state per channel, mirroring gateTrigger/envelope
+    // above. Each channel's shNoiseState is seeded differently so unpatched
+    // Signal (normalled to noise) doesn't sample identical "random" values
+    // on every channel at once.
+    dsp::SchmittTrigger shClockTrigger[PORT_MAX_CHANNELS];
+    float shValue[PORT_MAX_CHANNELS] = {};
+    uint32_t shNoiseState[PORT_MAX_CHANNELS];
     // The white-noise mix into the audio output is also a single shared
     // source (see process()) rather than one generator per poly voice —
     // decoupled from shNoiseState above since the two are gated separately.
@@ -115,6 +115,8 @@ struct LunarPapaSrapa : Module {
 
     LunarPapaSrapa() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+        for (int c = 0; c < PORT_MAX_CHANNELS; c++)
+            shNoiseState[c] = 0x1234567u + c * 0x9E3779B9u;
 
         float rateDefaultPos = std::pow((2.f - RATE_MIN_OCT) / (RATE_MAX_OCT - RATE_MIN_OCT), 1.f / RATE_CURVE_EXP);
         RateParamQuantity* rateQ = configParam<RateParamQuantity>(RATE_PARAM, 0.f, 1.f, rateDefaultPos, "LFO rate", " Hz");
@@ -147,19 +149,6 @@ struct LunarPapaSrapa : Module {
         configInput(ENV_INPUT, "Envelope CV input (normalled to internal envelope; connect to override)");
     }
 
-    json_t* dataToJson() override {
-        json_t* rootJ = json_object();
-        json_object_set_new(rootJ, "theme", json_integer(theme));
-        return rootJ;
-    }
-
-    void dataFromJson(json_t* rootJ) override {
-        json_t* themeJ = json_object_get(rootJ, "theme");
-        if (themeJ) {
-            theme = json_integer_value(themeJ);
-        }
-    }
-
     void process(const ProcessArgs& args) override {
         float rateOctaves = RATE_MIN_OCT + (RATE_MAX_OCT - RATE_MIN_OCT) * std::pow(params[RATE_PARAM].getValue(), RATE_CURVE_EXP);
 
@@ -189,23 +178,18 @@ struct LunarPapaSrapa : Module {
         bool shInputConnected = inputs[SH_INPUT].isConnected();
         float noiseAmount = params[NOISE_PARAM].getValue();
 
-        // The internal LFO/modulator is always monophonic: MOD_CV_INPUT and
-        // DIVIDER_CV_INPUT are read from channel 0 only, so a poly cable
-        // patched into either only affects the shared modulator through its
-        // first channel, matching the real hardware's single LFO per module.
-        float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getPolyVoltage(0) / 10.f, 0.f, 1.f);
-        // FM only: AM tested fine with the linear knob, only FM felt
-        // front-loaded against the real hardware (see MOD_CURVE_EXP above) —
-        // so the curve applies to fmDepth alone, not to modAmount (still used
-        // as-is for AM's amGain below).
-        float fmDepth = std::pow(modAmount, MOD_CURVE_EXP);
-        float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getPolyVoltage(0) / 10.f, 0.f, 1.f);
-
         // Poly channel count driven by CV, gate, AND the envelope input, so
         // that chaining another module's poly ENV_OUTPUT into ENV_INPUT
         // (overriding the internal envelope/gate entirely) still drives all
         // of its channels even when Pitch CV and Gate are mono or unpatched.
-        int channels = std::max(std::max(inputs[PITCH_CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), std::max(inputs[ENV_INPUT].getChannels(), 1));
+        // Modulation Depth CV and Divider CV are read per-channel below too
+        // (like the other poly inputs), so they also contribute here — a
+        // poly cable patched into only one of them (Pitch CV/Gate left mono)
+        // must still drive the full channel count. S&H is a separate section
+        // with its own channel count, computed further below.
+        int channels = std::max({inputs[PITCH_CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels(),
+                                  inputs[MOD_CV_INPUT].getChannels(), inputs[DIVIDER_CV_INPUT].getChannels(),
+                                  inputs[ENV_INPUT].getChannels(), 1});
 
         // Pass 1: envelopes are cheap (no std::exp) — compute them all up
         // front so we know whether ANY channel needs the expensive
@@ -233,9 +217,28 @@ struct LunarPapaSrapa : Module {
 
         // Mod is only ever used for LFO_OUTPUT or for the audio oscillators'
         // FM/AM (bypassed entirely in Noise-only mode) — skip it otherwise.
-        // Computed once regardless of channel count (see PapaSrapaModulator).
         bool needMod = lfoOutputConnected || (anyComputeAudio && !noiseOnly);
-        float modSquare = needMod ? modulator.process(args.sampleTime, rateOctaves, dividerAmount) : modulator.lfoOut;
+
+        // LFO/Modulation Depth/Divider are polyphonic: one PapaSrapaModulator
+        // per channel, each with its own Divider CV (and therefore its own
+        // rate) and its own Modulation Depth CV (feeding that channel's own
+        // FM/AM in Pass 2 below). Computed up front, same shape as the
+        // envelope pass above, so Pass 2's SIMD groups can load 4 lanes at once.
+        float modSquareValues[PORT_MAX_CHANNELS] = {};
+        float modAmountValues[PORT_MAX_CHANNELS] = {};
+        float fmDepthValues[PORT_MAX_CHANNELS] = {};
+        for (int c = 0; c < channels; c++) {
+            float modAmount = clamp(params[MOD_PARAM].getValue() + inputs[MOD_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
+            // FM only: AM tested fine with the linear knob, only FM felt
+            // front-loaded against the real hardware (see MOD_CURVE_EXP
+            // above) — so the curve applies to fmDepth alone, not to
+            // modAmount (still used as-is for AM's amGain in PapaSrapaCore).
+            float fmDepth = std::pow(modAmount, MOD_CURVE_EXP);
+            float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
+            modAmountValues[c] = modAmount;
+            fmDepthValues[c] = fmDepth;
+            modSquareValues[c] = needMod ? modulator[c].process(args.sampleTime, rateOctaves, dividerAmount) : modulator[c].lfoOut;
+        }
 
         // The audio noise mix is a single shared source too — one sample per
         // process() call is enough even with the main VCO polyphonic, since
@@ -244,21 +247,22 @@ struct LunarPapaSrapa : Module {
         bool needNoise = anyComputeAudio && (noiseOnly || noiseAmount > 0.f);
         float noiseSample = needNoise ? PapaSrapaCore::nextNoise(noiseState) : 0.f;
 
-        outputs[LFO_OUTPUT].setChannels(1);
-        outputs[LFO_OUTPUT].setVoltage(modulator.lfoOut * OUTPUT_VOLTAGE);
+        outputs[LFO_OUTPUT].setChannels(channels);
+        for (int c = 0; c < channels; c++)
+            outputs[LFO_OUTPUT].setVoltage(modSquareValues[c] * OUTPUT_VOLTAGE, c);
 
-        // Sample & hold is always monophonic: one clock, one held value. The
-        // internal noise source only needs to advance exactly on a clock
-        // edge — S&H never reads it in between anyway — so there's no
-        // "stay fresh every sample" cost at all here (unlike each voice's
-        // own noise, which is mixed continuously into the audio below).
-        if (shClockTrigger.process(inputs[SH_CLOCK_INPUT].getPolyVoltage(0))) {
-            shValue = shInputConnected ? inputs[SH_INPUT].getPolyVoltage(0) / OUTPUT_VOLTAGE
-                                        : PapaSrapaCore::nextNoise(shNoiseState);
+        // S&H is a section independent from the rest of the panel: its own
+        // channel count, driven by Signal/Clock rather than Pitch/Gate/Env.
+        int shChannels = std::max(std::max(inputs[SH_INPUT].getChannels(), inputs[SH_CLOCK_INPUT].getChannels()), 1);
+        for (int c = 0; c < shChannels; c++) {
+            if (shClockTrigger[c].process(inputs[SH_CLOCK_INPUT].getPolyVoltage(c))) {
+                shValue[c] = shInputConnected ? inputs[SH_INPUT].getPolyVoltage(c) / OUTPUT_VOLTAGE
+                                               : PapaSrapaCore::nextNoise(shNoiseState[c]);
+            }
+            outputs[SH_OUTPUT].setVoltage(shValue[c] * OUTPUT_VOLTAGE, c);
         }
-        outputs[SH_OUTPUT].setChannels(1);
-        outputs[SH_OUTPUT].setVoltage(shValue * OUTPUT_VOLTAGE);
-        lights[SH_LIGHT].setBrightness(clamp(std::fabs(shValue), 0.f, 1.f));
+        outputs[SH_OUTPUT].setChannels(shChannels);
+        lights[SH_LIGHT].setBrightness(clamp(std::fabs(shValue[0]), 0.f, 1.f));
 
         float maxEnvValue = 0.f;
         for (int c = 0; c < channels; c++) {
@@ -270,6 +274,9 @@ struct LunarPapaSrapa : Module {
             simd::float_4 pitchOctaves4 = params[PITCH_PARAM].getValue() + inputs[PITCH_CV_INPUT].getPolyVoltageSimd<simd::float_4>(base);
             simd::float_4 envValue4 = simd::float_4::load(&envValues[base]);
             simd::float_4 envAmount4 = simd::float_4::load(&envAmounts[base]);
+            simd::float_4 modSquare4 = simd::float_4::load(&modSquareValues[base]);
+            simd::float_4 modAmount4 = simd::float_4::load(&modAmountValues[base]);
+            simd::float_4 fmDepth4 = simd::float_4::load(&fmDepthValues[base]);
 
             // VCO_OUT is enveloped, so its audio oscillator is only computed
             // when patched AND at least one lane's envelope is above 0
@@ -281,7 +288,7 @@ struct LunarPapaSrapa : Module {
             simd::float_4 vco4 = simd::float_4::zero();
             if (vcoOutputConnected && simd::movemask(envAmount4 > 0.f) != 0) {
                 vco4 = core[base / 4].process(args.sampleTime, args.sampleRate, pitchOctaves4,
-                    modSquare, modAmount, fmDepth, mode, noiseSample, noiseAmount, noiseOnly);
+                    modSquare4, modAmount4, fmDepth4, mode, noiseSample, noiseAmount, noiseOnly);
             }
 
             outputs[VCO_OUT].setVoltageSimd(vco4 * OUTPUT_VOLTAGE * envAmount4, base);
@@ -296,12 +303,12 @@ struct LunarPapaSrapa : Module {
     }
 };
 
-struct LunarPapaSrapaWidget : ModuleWidget, ThemedModuleWidget {
+struct LunarPapaSrapaWidget : ModuleWidget {
     int appliedTheme = -1;
 
     LunarPapaSrapaWidget(LunarPapaSrapa* module) {
         setModule(module);
-        syncPanelTheme(this, "LunarPapaSrapa", module ? module->theme : 0, appliedTheme);
+        syncPanelTheme(this, "LunarPapaSrapa", appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -350,29 +357,12 @@ struct LunarPapaSrapaWidget : ModuleWidget, ThemedModuleWidget {
     }
 
     void step() override {
-        if (module) syncPanelTheme(this, "LunarPapaSrapa", dynamic_cast<LunarPapaSrapa*>(module)->theme, appliedTheme);
+        syncPanelTheme(this, "LunarPapaSrapa", appliedTheme);
         ModuleWidget::step();
     }
 
-    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
-        LunarPapaSrapa* module = dynamic_cast<LunarPapaSrapa*>(this->module);
-        pushIntFieldChange(module, "change theme", module->theme, theme,
-            [](engine::Module* m, int v) { dynamic_cast<LunarPapaSrapa*>(m)->theme = v; }, complexAction);
-        module->theme = theme;
-        appliedTheme = theme;
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarPapaSrapa", theme))));
-    }
-
     void appendContextMenu(Menu* menu) override {
-        LunarPapaSrapa* module = dynamic_cast<LunarPapaSrapa*>(this->module);
-        assert(module);
-
-        menu->addChild(new MenuSeparator);
-        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
-            [=]() { return module->theme; },
-            [=](int theme) { applyTheme(theme); }
-        ));
-        appendApplyThemeToAllItem(menu, module->theme);
+        appendAmbientThemeMenu(menu);
     }
 };
 

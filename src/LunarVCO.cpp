@@ -4,8 +4,6 @@
 #include "PanelTheme.hpp"
 
 struct LunarVCO : Module {
-    int theme = 0;
-
     enum ParamIds {
         WAVEFORM_PARAM,
         TUNE_PARAM,
@@ -84,25 +82,19 @@ struct LunarVCO : Module {
         configInput(ENV_INPUT, "Envelope In (overrides internal envelope, gate and hold when connected)");
     }
 
-    json_t* dataToJson() override {
-        json_t* rootJ = json_object();
-        json_object_set_new(rootJ, "theme", json_integer(theme));
-        return rootJ;
-    }
-
-    void dataFromJson(json_t* rootJ) override {
-        json_t* themeJ = json_object_get(rootJ, "theme");
-        if (themeJ) {
-            theme = json_integer_value(themeJ);
-        }
-    }
-
     void process(const ProcessArgs& args) override {
-        // Poly channel count driven by CV, gate, AND the envelope input, so
-        // that chaining another module's poly ENV_OUTPUT into ENV_INPUT
-        // (overriding the internal envelope/gate entirely) still drives all
-        // of its channels even when V/oct and Gate are mono or unpatched.
-        int channels = std::max(std::max(inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), std::max(inputs[ENV_INPUT].getChannels(), 1));
+        // Poly channel count driven by V/oct, gate, the envelope input, AND
+        // FM/Shape CV/Sync — the latter three are already read per-channel
+        // below (getPolyVoltageSimd) but didn't used to drive the channel
+        // count themselves, so a poly cable patched only into one of them
+        // (V/oct and Gate left mono) used to be silently truncated to 1
+        // channel. Also lets chaining another module's poly ENV_OUTPUT into
+        // ENV_INPUT (overriding the internal envelope/gate entirely) still
+        // drive all of its channels even when every other input is mono or
+        // unpatched.
+        int channels = std::max({inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels(),
+                                  inputs[FM_INPUT].getChannels(), inputs[SHAPE_CV_INPUT].getChannels(),
+                                  inputs[SYNC_INPUT].getChannels(), inputs[ENV_INPUT].getChannels(), 1});
 
         bool expMode = params[LINEXP_PARAM].getValue() > 0.f;
         bool octaveOn = params[OCTAVE_PARAM].getValue() > 0.f;
@@ -187,12 +179,12 @@ struct LunarVCO : Module {
     }
 };
 
-struct LunarVCOWidget : ModuleWidget, ThemedModuleWidget {
+struct LunarVCOWidget : ModuleWidget {
     int appliedTheme = -1;
 
     LunarVCOWidget(LunarVCO* module) {
         setModule(module);
-        syncPanelTheme(this, "LunarVCO", module ? module->theme : 0, appliedTheme);
+        syncPanelTheme(this, "LunarVCO", appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -253,29 +245,12 @@ struct LunarVCOWidget : ModuleWidget, ThemedModuleWidget {
     }
 
     void step() override {
-        if (module) syncPanelTheme(this, "LunarVCO", dynamic_cast<LunarVCO*>(module)->theme, appliedTheme);
+        syncPanelTheme(this, "LunarVCO", appliedTheme);
         ModuleWidget::step();
     }
 
-    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
-        LunarVCO* module = dynamic_cast<LunarVCO*>(this->module);
-        pushIntFieldChange(module, "change theme", module->theme, theme,
-            [](engine::Module* m, int v) { dynamic_cast<LunarVCO*>(m)->theme = v; }, complexAction);
-        module->theme = theme;
-        appliedTheme = theme;
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarVCO", theme))));
-    }
-
     void appendContextMenu(Menu* menu) override {
-        LunarVCO* module = dynamic_cast<LunarVCO*>(this->module);
-        assert(module);
-
-        menu->addChild(new MenuSeparator);
-        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
-            [=]() { return module->theme; },
-            [=](int theme) { applyTheme(theme); }
-        ));
-        appendApplyThemeToAllItem(menu, module->theme);
+        appendAmbientThemeMenu(menu);
     }
 };
 

@@ -7,8 +7,6 @@ struct Lunar50Drone : Module {
     static const int NUM_OSC = DroneVoice::NUM_OSC;
     static constexpr float OUTPUT_VOLTAGE = 5.f; // Eurorack ±5V audio convention
 
-    int theme = 0;
-
     enum MixMode { MIX_FIXED = 0, MIX_AVERAGE_ACTIVE = 1, MIX_SOFT_CLIP = 2 };
     int mixMode = 0; // 0 = Fixed /5 (legacy), keeps existing patches sounding the same
 
@@ -52,12 +50,12 @@ struct Lunar50Drone : Module {
     Lunar50Drone() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         for (int i = 0; i < NUM_OSC; i++) {
-            configInput(TRIG_INPUT + i, string::f("Oscillator %d activation trigger", i + 1));
+            configInput(TRIG_INPUT + i, string::f("Oscillator %d activation trigger (mono)", i + 1));
             configSwitch(ACTIVE_PARAM + i, 0.f, 1.f, 0.f, string::f("Oscillator %d active", i + 1), {"Inactive", "Active"});
             configParam(FREQ_PARAM + i, -8.f, 4.f, -1.f, string::f("Oscillator %d frequency", i + 1), " Hz", 2.f, dsp::FREQ_C4);
             configSwitch(MOD_PARAM + i, 0.f, 1.f, 0.f, string::f("Oscillator %d modulation", i + 1), {"Off", "On"});
         }
-        configParam(ATTEN_PARAM, -1.f, 1.f, 0.f, "CV Attenuverter", "%", 0.f, 100.f);
+        configParam(ATTEN_PARAM, -1.f, 1.f, 1.f, "CV Attenuverter", "%", 0.f, 100.f);
         configInput(CV_INPUT, "Frequency CV (applies to all oscillators)");
         configOutput(SAW_OUTPUT, "Sawtooth mix");
 
@@ -75,7 +73,6 @@ struct Lunar50Drone : Module {
     json_t* dataToJson() override {
         json_t* rootJ = json_object();
         json_object_set_new(rootJ, "fmTopology", json_integer(voice[0].fmTopology));
-        json_object_set_new(rootJ, "theme", json_integer(theme));
         json_object_set_new(rootJ, "mixMode", json_integer(mixMode));
         return rootJ;
     }
@@ -86,10 +83,6 @@ struct Lunar50Drone : Module {
             int fmTopology = json_integer_value(fmTopologyJ);
             for (int c = 0; c < PORT_MAX_CHANNELS; c++) voice[c].fmTopology = fmTopology;
         }
-        json_t* themeJ = json_object_get(rootJ, "theme");
-        if (themeJ) {
-            theme = json_integer_value(themeJ);
-        }
         json_t* mixModeJ = json_object_get(rootJ, "mixMode");
         if (mixModeJ) {
             mixMode = json_integer_value(mixModeJ);
@@ -97,11 +90,13 @@ struct Lunar50Drone : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        // Poly channel count driven by CV, gate, AND the envelope input, so
-        // that chaining another module's poly ENV_OUTPUT into ENV_INPUT
-        // (overriding the internal envelope/gate entirely) still drives all
-        // of its channels even when CV and Gate are mono or unpatched.
-        int channels = std::max(std::max(inputs[CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), std::max(inputs[ENV_INPUT].getChannels(), 1));
+        // Poly channel count driven by CV, gate, VOLT CV, AND the envelope
+        // input, so that chaining another module's poly ENV_OUTPUT into
+        // ENV_INPUT (overriding the internal envelope/gate entirely) still
+        // drives all of its channels even when the other inputs are mono or
+        // unpatched.
+        int channels = std::max({inputs[CV_INPUT].getChannels(), inputs[GATE_INPUT].getChannels(),
+                                  inputs[VOLT_CV_INPUT].getChannels(), inputs[ENV_INPUT].getChannels(), 1});
 
         bool active[NUM_OSC];
         bool mod[NUM_OSC];
@@ -128,8 +123,10 @@ struct Lunar50Drone : Module {
         // generators at the same time. After half the stroke of the knob,
         // generators start to modulate each other creating FM synthesis
         // effect" — see DroneVoice::process() for the detune/FM curve.
-        // 0..10V CV, added to the knob and clamped back into the knob's own 0..1 range.
-        float volt = clamp(params[VOLT_PARAM].getValue() + inputs[VOLT_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+        // Knob value cached here; the CV itself (0..10V, added to the knob and
+        // clamped back into the knob's own 0..1 range) is read per-channel
+        // below via getPolyVoltage(c), same as the other poly CV inputs.
+        float voltParam = params[VOLT_PARAM].getValue();
 
         bool holdActive = params[HOLD_PARAM].getValue() > 0.f;
         // Attack/Release knobs are non-poly (same for every channel) — compute
@@ -146,6 +143,7 @@ struct Lunar50Drone : Module {
             // Same CV offset (in octaves) applied to every oscillator, so it shifts
             // all 5 frequencies together while preserving the intervals between them.
             float cv = inputs[CV_INPUT].getPolyVoltage(c) * atten;
+            float volt = clamp(voltParam + inputs[VOLT_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
 
             float envValue;
             if (envInputConnected) {
@@ -187,12 +185,12 @@ struct Lunar50Drone : Module {
     }
 };
 
-struct Lunar50DroneWidget : ModuleWidget, ThemedModuleWidget {
+struct Lunar50DroneWidget : ModuleWidget {
     int appliedTheme = -1;
 
     Lunar50DroneWidget(Lunar50Drone* module) {
         setModule(module);
-        syncPanelTheme(this, "Lunar50Drone", module ? module->theme : 0, appliedTheme);
+        syncPanelTheme(this, "Lunar50Drone", appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -226,29 +224,15 @@ struct Lunar50DroneWidget : ModuleWidget, ThemedModuleWidget {
     }
 
     void step() override {
-        if (module) syncPanelTheme(this, "Lunar50Drone", dynamic_cast<Lunar50Drone*>(module)->theme, appliedTheme);
+        syncPanelTheme(this, "Lunar50Drone", appliedTheme);
         ModuleWidget::step();
-    }
-
-    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
-        Lunar50Drone* module = dynamic_cast<Lunar50Drone*>(this->module);
-        pushIntFieldChange(module, "change theme", module->theme, theme,
-            [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->theme = v; }, complexAction);
-        module->theme = theme;
-        appliedTheme = theme;
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("Lunar50Drone", theme))));
     }
 
     void appendContextMenu(Menu* menu) override {
         Lunar50Drone* module = dynamic_cast<Lunar50Drone*>(this->module);
         assert(module);
 
-        menu->addChild(new MenuSeparator);
-        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
-            [=]() { return module->theme; },
-            [=](int theme) { applyTheme(theme); }
-        ));
-        appendApplyThemeToAllItem(menu, module->theme);
+        appendAmbientThemeMenu(menu);
         menu->addChild(createIndexSubmenuItem("FM topology", {"Average of active others", "Circular chain"},
             [=]() { return module->voice[0].fmTopology; },
             [=](int topology) {
