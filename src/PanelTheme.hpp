@@ -3,11 +3,15 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include "plugin.hpp"
 
 using namespace rack;
 
-// Shared named-theme mechanism: each module keeps a `theme` index (persisted
-// via dataToJson/dataFromJson) resolved to "res/<ModuleName>_<ThemeName>.svg".
+// AmbientModules-wide panel theme: a single value persisted process-wide (in
+// Rack's user asset dir), same pattern as Aluminium's own PanelTheme
+// (plugins/Aluminium/src/PanelTheme.cpp) — rather than per-module/per-patch,
+// so every module, already placed or added later, always shows the same
+// currently-chosen theme with no separate "apply to all" step needed.
 static const std::vector<std::string> PANEL_THEMES = {"Cream", "Black", "Pink", "Yellow", "Blue"};
 
 static std::string panelThemePath(const std::string& moduleName, int themeIndex) {
@@ -16,24 +20,28 @@ static std::string panelThemePath(const std::string& moduleName, int themeIndex)
     return "res/" + moduleName + "_" + PANEL_THEMES[themeIndex] + ".svg";
 }
 
+extern int ambientTheme;
+
+void loadAmbientTheme();
+void setAmbientTheme(int theme);
+
 // Cardinal's Engine::fromJson (src/override/Engine.cpp) creates the
 // ModuleWidget *before* calling Module::fromJson(), unlike vanilla Rack —
-// so the panel set in the widget constructor can be stale by the time the
-// module's persisted `theme` is actually loaded. Widgets call this from both
-// their constructor and step() (cheap int compare, no-op unless the theme
-// actually changed) so the panel self-corrects as soon as the real theme is
-// known, regardless of load order.
-static inline void syncPanelTheme(rack::app::ModuleWidget* w, const std::string& moduleName, int wantedTheme, int& appliedTheme) {
-    if (wantedTheme == appliedTheme) return;
-    appliedTheme = wantedTheme;
-    w->setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath(moduleName, wantedTheme))));
+// widgets call this from both their constructor and step() (cheap int
+// compare, no-op unless the theme actually changed) so the panel
+// self-corrects as soon as the plugin's theme file has been loaded,
+// regardless of load order.
+static inline void syncPanelTheme(rack::app::ModuleWidget* w, const std::string& moduleName, int& appliedTheme) {
+    if (ambientTheme == appliedTheme) return;
+    appliedTheme = ambientTheme;
+    w->setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath(moduleName, ambientTheme))));
 }
 
 // createIndexSubmenuItem/createIndexPtrSubmenuItem (Rack's context-menu
 // helpers) call their setter directly with no undo/redo or dirty-patch side
 // effect at all — history::State::isSaved() only looks at whether an
-// history::Action was ever pushed, so a menu-only field change (theme, FM
-// topology, ...) never marks the patch as modified and can be silently lost
+// history::Action was ever pushed, so a menu-only field change (FM topology,
+// CV range, ...) never marks the patch as modified and can be silently lost
 // on close. Push one of these instead of writing the field directly to fix
 // that, matching how knob/param changes already behave.
 struct IntFieldChange : history::ModuleAction {
@@ -63,27 +71,14 @@ static inline void pushIntFieldChange(engine::Module* module, const std::string&
     else APP->history->push(h);
 }
 
-// Mixin implemented by every AmbientModules ModuleWidget that has a theme, so
-// "apply to all" can reach each one without a per-type dynamic_cast chain.
-struct ThemedModuleWidget {
-    virtual ~ThemedModuleWidget() = default;
-    virtual void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) = 0;
-};
-
-// Batches every module's theme change into one history::ComplexAction, so a
-// single undo reverts the whole "apply to all" instead of one step per module.
-static inline void appendApplyThemeToAllItem(Menu* menu, int currentTheme) {
-    menu->addChild(createMenuItem("Apply theme to all AmbientModules", "", [=]() {
-        history::ComplexAction* complexAction = new history::ComplexAction;
-        complexAction->name = "apply theme to all panels";
-        for (ModuleWidget* mw : APP->scene->rack->getModules()) {
-            if (!mw->model || mw->model->plugin != pluginInstance) continue;
-            if (ThemedModuleWidget* themed = dynamic_cast<ThemedModuleWidget*>(mw))
-                themed->applyTheme(currentTheme, complexAction);
-        }
-        if (!complexAction->isEmpty())
-            APP->history->push(complexAction);
-        else
-            delete complexAction;
-    }));
+// Appends the single "Theme" submenu shared by every AmbientModules module's
+// right-click menu — changes the plugin-wide ambientTheme immediately,
+// repainting every open module (old or new) since they all read the same
+// global on their next step().
+inline void appendAmbientThemeMenu(Menu* menu) {
+    menu->addChild(new MenuSeparator);
+    menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
+        [=]() { return ambientTheme; },
+        [=](int theme) { setAmbientTheme(theme); }
+    ));
 }

@@ -3,7 +3,6 @@
 #include "PanelTheme.hpp"
 
 struct LunarLFO : Module {
-    int theme = 0;
     int cvRangeIndex = 0; // index into cvRanges, default matches hardware (0V to +5V, oscilloscope-verified)
 
     static constexpr float cvRanges[4][2] = { {0.f, 5.f}, {0.f, 10.f}, {-5.f, 5.f}, {-10.f, 10.f} };
@@ -54,16 +53,11 @@ struct LunarLFO : Module {
 
     json_t* dataToJson() override {
         json_t* rootJ = json_object();
-        json_object_set_new(rootJ, "theme", json_integer(theme));
         json_object_set_new(rootJ, "cvRangeIndex", json_integer(cvRangeIndex));
         return rootJ;
     }
 
     void dataFromJson(json_t* rootJ) override {
-        json_t* themeJ = json_object_get(rootJ, "theme");
-        if (themeJ) {
-            theme = json_integer_value(themeJ);
-        }
         json_t* cvRangeJ = json_object_get(rootJ, "cvRangeIndex");
         if (cvRangeJ) {
             cvRangeIndex = json_integer_value(cvRangeJ);
@@ -94,12 +88,12 @@ struct LunarLFO : Module {
 
 constexpr float LunarLFO::cvRanges[4][2];
 
-struct LunarLFOWidget : ModuleWidget, ThemedModuleWidget {
+struct LunarLFOWidget : ModuleWidget {
     int appliedTheme = -1;
 
     LunarLFOWidget(LunarLFO* module) {
         setModule(module);
-        syncPanelTheme(this, "LunarLFO", module ? module->theme : 0, appliedTheme);
+        syncPanelTheme(this, "LunarLFO", appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
@@ -116,29 +110,15 @@ struct LunarLFOWidget : ModuleWidget, ThemedModuleWidget {
     }
 
     void step() override {
-        if (module) syncPanelTheme(this, "LunarLFO", dynamic_cast<LunarLFO*>(module)->theme, appliedTheme);
+        syncPanelTheme(this, "LunarLFO", appliedTheme);
         ModuleWidget::step();
-    }
-
-    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
-        LunarLFO* module = dynamic_cast<LunarLFO*>(this->module);
-        pushIntFieldChange(module, "change theme", module->theme, theme,
-            [](engine::Module* m, int v) { dynamic_cast<LunarLFO*>(m)->theme = v; }, complexAction);
-        module->theme = theme;
-        appliedTheme = theme;
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarLFO", theme))));
     }
 
     void appendContextMenu(Menu* menu) override {
         LunarLFO* module = dynamic_cast<LunarLFO*>(this->module);
         assert(module);
 
-        menu->addChild(new MenuSeparator);
-        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
-            [=]() { return module->theme; },
-            [=](int theme) { applyTheme(theme); }
-        ));
-        appendApplyThemeToAllItem(menu, module->theme);
+        appendAmbientThemeMenu(menu);
 
         menu->addChild(createIndexSubmenuItem("CV Range",
             {"0V to +5V", "0V to +10V", "-5V to +5V", "-10V to +10V"},

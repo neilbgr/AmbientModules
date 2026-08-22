@@ -59,7 +59,6 @@ using ClickTargetCKSSThreeHorizontal = ClickTargetSwitch<CKSSThreeHorizontal>;
 struct LunarSequencer : Module {
     static const int NUM_STEPS = 5;
 
-    int theme = 0;
     int cvRangeIndex = 0; // index into cvRanges
 
     enum ParamIds {
@@ -127,16 +126,11 @@ struct LunarSequencer : Module {
 
     json_t* dataToJson() override {
         json_t* rootJ = json_object();
-        json_object_set_new(rootJ, "theme", json_integer(theme));
         json_object_set_new(rootJ, "cvRangeIndex", json_integer(cvRangeIndex));
         return rootJ;
     }
 
     void dataFromJson(json_t* rootJ) override {
-        json_t* themeJ = json_object_get(rootJ, "theme");
-        if (themeJ) {
-            theme = json_integer_value(themeJ);
-        }
         json_t* cvRangeJ = json_object_get(rootJ, "cvRangeIndex");
         if (cvRangeJ) {
             cvRangeIndex = json_integer_value(cvRangeJ);
@@ -212,12 +206,12 @@ std::string StepCvQuantity::getDisplayValueString() {
     return string::f("%.2fV", volts);
 }
 
-struct LunarSequencerWidget : ModuleWidget, ThemedModuleWidget {
+struct LunarSequencerWidget : ModuleWidget {
     int appliedTheme = -1;
 
     LunarSequencerWidget(LunarSequencer* module) {
         setModule(module);
-        syncPanelTheme(this, "LunarSequencer", module ? module->theme : 0, appliedTheme);
+        syncPanelTheme(this, "LunarSequencer", appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
@@ -249,29 +243,15 @@ struct LunarSequencerWidget : ModuleWidget, ThemedModuleWidget {
     }
 
     void step() override {
-        if (module) syncPanelTheme(this, "LunarSequencer", dynamic_cast<LunarSequencer*>(module)->theme, appliedTheme);
+        syncPanelTheme(this, "LunarSequencer", appliedTheme);
         ModuleWidget::step();
-    }
-
-    void applyTheme(int theme, history::ComplexAction* complexAction = nullptr) override {
-        LunarSequencer* module = dynamic_cast<LunarSequencer*>(this->module);
-        pushIntFieldChange(module, "change theme", module->theme, theme,
-            [](engine::Module* m, int v) { dynamic_cast<LunarSequencer*>(m)->theme = v; }, complexAction);
-        module->theme = theme;
-        appliedTheme = theme;
-        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath("LunarSequencer", theme))));
     }
 
     void appendContextMenu(Menu* menu) override {
         LunarSequencer* module = dynamic_cast<LunarSequencer*>(this->module);
         assert(module);
 
-        menu->addChild(new MenuSeparator);
-        menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
-            [=]() { return module->theme; },
-            [=](int theme) { applyTheme(theme); }
-        ));
-        appendApplyThemeToAllItem(menu, module->theme);
+        appendAmbientThemeMenu(menu);
 
         menu->addChild(createIndexSubmenuItem("CV Range",
             {"0V to +5V", "0V to +10V", "-5V to +5V", "-10V to +10V"},
