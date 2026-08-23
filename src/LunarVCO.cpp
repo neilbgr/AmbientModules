@@ -92,6 +92,14 @@ struct LunarVCO : Module {
         // ENV_INPUT (overriding the internal envelope/gate entirely) still
         // drive all of its channels even when every other input is mono or
         // unpatched.
+        //
+        // Deliberately max, not min: a mono/unpatched input (e.g. a single
+        // shared Gate) is broadcast to every channel by Rack's own
+        // getPolyVoltage()/getPolyVoltageSimd() — that's the standard Rack
+        // pattern letting some CVs stay mono while others go fully poly.
+        // Taking the min would collapse the whole module to 1 channel the
+        // moment any single CV input isn't patched as poly, silently killing
+        // the other voices even though V/oct alone was driving 4 of them.
         int channels = std::max({inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels(),
                                   inputs[FM_INPUT].getChannels(), inputs[SHAPE_CV_INPUT].getChannels(),
                                   inputs[SYNC_INPUT].getChannels(), inputs[ENV_INPUT].getChannels(), 1});

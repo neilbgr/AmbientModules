@@ -59,6 +59,15 @@ struct LunarVCOCore {
         return state;
     }
 
+    // Cheap Pade(3,2) rational approximation of tanh (no simd::tanh in the
+    // Rack SDK, and real std::tanh would mean 4 scalar calls + repacking per
+    // SIMD group, per sample) — unity gain near 0 so normal-amplitude signal
+    // passes through unchanged, smoothly saturating toward +-1 beyond that.
+    static simd::float_4 fastTanh(simd::float_4 x) {
+        x = simd::clamp(x, -3.f, 3.f);
+        return x * (27.f + x * x) / (27.f + 9.f * x * x);
+    }
+
     simd::float_4 phase = 0.f;
     simd::float_4 subPhase = 0.f;
     simd::float_4 cornerSmooth = 0.f;
@@ -172,6 +181,9 @@ struct LunarVCOCore {
             out *= 0.5f; // keep overall level in check with the sub mixed in
         }
 
-        return out;
+        // PolyBLEP correction near Square/Inv Saw edges (and the sub-osc sum
+        // above) can transiently push out past +-1 — soft-clip rather than
+        // let those spikes hit the module's x5V output stage undamped.
+        return fastTanh(out);
     }
 };
