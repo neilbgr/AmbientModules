@@ -15,8 +15,9 @@ using namespace rack;
 static const std::vector<std::string> PANEL_THEMES = {"Cream", "Black", "Pink", "Yellow", "Blue"};
 
 static std::string panelThemePath(const std::string& moduleName, int themeIndex) {
-    if (themeIndex < 0 || themeIndex >= (int)PANEL_THEMES.size())
+    if (themeIndex < 0 || themeIndex >= (int)PANEL_THEMES.size()) {
         themeIndex = 0;
+    }
     return "res/" + moduleName + "_" + PANEL_THEMES[themeIndex] + ".svg";
 }
 
@@ -32,7 +33,9 @@ void setAmbientTheme(int theme);
 // self-corrects as soon as the plugin's theme file has been loaded,
 // regardless of load order.
 static inline void syncPanelTheme(rack::app::ModuleWidget* w, const std::string& moduleName, int& appliedTheme) {
-    if (ambientTheme == appliedTheme) return;
+    if (ambientTheme == appliedTheme) {
+        return;
+    }
     appliedTheme = ambientTheme;
     w->setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, panelThemePath(moduleName, ambientTheme))));
 }
@@ -50,25 +53,35 @@ struct IntFieldChange : history::ModuleAction {
     std::function<void(engine::Module*, int)> apply;
 
     void undo() override {
-        if (engine::Module* m = APP->engine->getModule(moduleId)) apply(m, oldValue);
+        if (engine::Module* m = APP->engine->getModule(moduleId)) {
+            apply(m, oldValue);
+        }
     }
     void redo() override {
-        if (engine::Module* m = APP->engine->getModule(moduleId)) apply(m, newValue);
+        if (engine::Module* m = APP->engine->getModule(moduleId)) {
+            apply(m, newValue);
+        }
     }
 };
 
 static inline void pushIntFieldChange(engine::Module* module, const std::string& actionName, int oldValue, int newValue,
                                        std::function<void(engine::Module*, int)> apply,
                                        history::ComplexAction* complexAction = nullptr) {
-    if (oldValue == newValue) return;
+    if (oldValue == newValue) {
+        return;
+    }
     IntFieldChange* h = new IntFieldChange;
     h->name = actionName;
     h->moduleId = module->id;
     h->oldValue = oldValue;
     h->newValue = newValue;
     h->apply = apply;
-    if (complexAction) complexAction->push(h);
-    else APP->history->push(h);
+    if (complexAction) {
+        complexAction->push(h);
+    }
+    else {
+        APP->history->push(h);
+    }
 }
 
 // Appends the single "Theme" submenu shared by every AmbientModules module's

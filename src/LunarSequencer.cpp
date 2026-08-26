@@ -22,10 +22,14 @@ template <typename TBase>
 struct ClickTargetSwitch : TBase {
     void onButton(const widget::Widget::ButtonEvent& e) override {
         TBase::onButton(e);
-        if (e.action != GLFW_PRESS || e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+        if (e.action != GLFW_PRESS || e.button != GLFW_MOUSE_BUTTON_LEFT) {
+            return;
+        }
 
         engine::ParamQuantity* pq = this->getParamQuantity();
-        if (!pq) return;
+        if (!pq) {
+            return;
+        }
 
         // CKSSThreeHorizontal is wider than tall, CKSSThree the opposite.
         bool horizontal = this->box.size.x > this->box.size.y;
@@ -33,11 +37,15 @@ struct ClickTargetSwitch : TBase {
         frac = clamp(frac, 0.f, 1.f);
         // Vertical: value 0 is at the bottom (see STAGES_PARAM comment below),
         // so flip so frac still runs low-to-high with the value.
-        if (!horizontal) frac = 1.f - frac;
+        if (!horizontal) {
+            frac = 1.f - frac;
+        }
 
         float oldValue = pq->getValue();
         float newValue = (frac < 1.f / 3.f) ? 0.f : (frac < 2.f / 3.f) ? 1.f : 2.f;
-        if (newValue == oldValue) return;
+        if (newValue == oldValue) {
+            return;
+        }
         pq->setValue(newValue);
 
         history::ParamChange* h = new history::ParamChange;
@@ -152,7 +160,9 @@ struct LunarSequencer : Module {
         {
             float freq = octavesToHz(params[RATE_PARAM].getValue());
             pulserPhase += freq * args.sampleTime;
-            if (pulserPhase >= 1.f) pulserPhase -= 1.f;
+            if (pulserPhase >= 1.f) {
+                pulserPhase -= 1.f;
+            }
             effectiveClockVoltage = (pulserPhase < 0.5f) ? 10.f : 0.f;
         }
 
@@ -170,7 +180,9 @@ struct LunarSequencer : Module {
         if (clockTrigger.process(effectiveClockVoltage, 0.1f, 1.f)) {
             stepIndex = (stepIndex + 1) % stages;
         }
-        if (stepIndex >= stages) stepIndex = 0;
+        if (stepIndex >= stages) {
+            stepIndex = 0;
+        }
 
         outputs[CLOCK_OUTPUT].setVoltage(effectiveClockVoltage);
 

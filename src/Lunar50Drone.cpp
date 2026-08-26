@@ -116,7 +116,9 @@ struct Lunar50Drone : Module {
 
         int activeCount = 0;
         for (int i = 0; i < NUM_OSC; i++) {
-            if (active[i]) activeCount++;
+            if (active[i]) {
+                activeCount++;
+            }
         }
 
         // VOLT knob, per the official doc: "transposes down all 5 voice

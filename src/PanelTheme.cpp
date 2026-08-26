@@ -6,19 +6,22 @@ int ambientTheme = 0;
 void loadAmbientTheme() {
     std::string path = asset::user("AmbientModules.json");
     FILE* f = std::fopen(path.c_str(), "r");
-    if (!f)
+    if (!f) {
         return;
+    }
 
     json_error_t error;
     json_t* rootJ = json_loadf(f, 0, &error);
     std::fclose(f);
-    if (!rootJ)
+    if (!rootJ) {
         return;
+    }
 
     if (json_t* themeJ = json_object_get(rootJ, "theme")) {
         int theme = json_integer_value(themeJ);
-        if (theme >= 0 && theme < (int)PANEL_THEMES.size())
+        if (theme >= 0 && theme < (int)PANEL_THEMES.size()) {
             ambientTheme = theme;
+        }
     }
     json_decref(rootJ);
 }

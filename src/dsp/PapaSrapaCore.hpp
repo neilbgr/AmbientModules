@@ -224,8 +224,9 @@ struct PapaSrapaCore {
     simd::float_4 process(float sampleTime, float sampleRate, simd::float_4 pitchOctaves,
                            simd::float_4 modSquare, simd::float_4 modDepth, simd::float_4 fmDepth, ModMode modMode,
                            float noiseSample, float noiseAmount, bool noiseOnly) {
-        if (noiseOnly)
+        if (noiseOnly) {
             return simd::float_4(noiseSample);
+        }
 
         if (sampleTime != cachedSampleTime) {
             cachedSampleTime = sampleTime;

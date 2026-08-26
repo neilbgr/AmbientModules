@@ -115,8 +115,9 @@ struct LunarPapaSrapa : Module {
 
     LunarPapaSrapa() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        for (int c = 0; c < PORT_MAX_CHANNELS; c++)
+        for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
             shNoiseState[c] = 0x1234567u + c * 0x9E3779B9u;
+        }
 
         float rateDefaultPos = std::pow((2.f - RATE_MIN_OCT) / (RATE_MAX_OCT - RATE_MIN_OCT), 1.f / RATE_CURVE_EXP);
         RateParamQuantity* rateQ = configParam<RateParamQuantity>(RATE_PARAM, 0.f, 1.f, rateDefaultPos, "LFO rate", " Hz");
@@ -211,8 +212,9 @@ struct LunarPapaSrapa : Module {
             envValues[c] = envValue;
             float envAmount = clamp(envValue, 0.f, 1.f);
             envAmounts[c] = envAmount;
-            if (vcoOutputConnected && envAmount > 0.f)
+            if (vcoOutputConnected && envAmount > 0.f) {
                 anyComputeAudio = true;
+            }
         }
 
         // Mod is only ever used for LFO_OUTPUT or for the audio oscillators'
@@ -248,8 +250,9 @@ struct LunarPapaSrapa : Module {
         float noiseSample = needNoise ? PapaSrapaCore::nextNoise(noiseState) : 0.f;
 
         outputs[LFO_OUTPUT].setChannels(channels);
-        for (int c = 0; c < channels; c++)
+        for (int c = 0; c < channels; c++) {
             outputs[LFO_OUTPUT].setVoltage(modSquareValues[c] * OUTPUT_VOLTAGE, c);
+        }
 
         // S&H is a section independent from the rest of the panel: its own
         // channel count, driven by Signal/Clock rather than Pitch/Gate/Env.
