@@ -11,7 +11,7 @@
 | [LunarVCO](#lunarvco)             | AS3340-style VCO with ADSR and hard sync           | Voices "VCO A / VCO B"                     |
 | [LunarPapaSrapa](#lunarpapasrapa) | FM/AM cross-modulated noise/drone voice            | Drone voices 3, 6 "Papa Srapa"             |
 | [LunarLFO](#lunarlfo)             | Dual unipolar triangle/square LFO                  | LFOs                                       |
-| [LunarSequencer](#lunarsequencer) | 5-stage Buchla-inspired CV/gate sequencer          | Sequencer                                  |
+| [LunarSequencer](#lunarsequencer) | 3-to-5-stage Buchla-inspired CV/gate sequencer     | Sequencer                                  |
 
 ## Table of Contents
 
@@ -132,7 +132,7 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 - **FM amount** — attenuverter for the FM input.
 - **Attack / Decay / Sustain / Release** — the built-in ADSR envelope.
 - **Hold** (lit button) — see [Shared conventions](#shared-conventions).
-- **Self-generation** (lit button) — turns the envelope generator into a free-running LFO instead of a one-shot envelope; Attack and Release should be turned low (towards 9 o'clock) for this to cycle usefully.
+- **Self-generation** (lit button) — turns the envelope generator into a free-running LFO instead of a one-shot envelope; Attack and Release should be turned low (towards 9 o'clock) for this to cycle usefully, and Sustain sets its peak depth. Still needs Gate to have gone high at least once (or Hold engaged) to start — it doesn't cycle on its own from silence.
 
 **Inputs**
 - **V/oct** — pitch, standard 1V/octave.
@@ -151,7 +151,7 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 
 **Patch ideas**
 - Drive V/oct from [LunarSequencer](#lunarsequencer)'s Step CV output for melodic drone runs.
-- Enable Self-generation with a slow Attack/Release to use the envelope itself as a free amplitude LFO, no Gate needed.
+- Enable Self-generation with a slow Attack/Release and Hold engaged to use the envelope itself as a free amplitude LFO with nothing patched into Gate.
 
 ## LunarLFO
 
@@ -222,11 +222,11 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 
 ![LunarSequencer panel](docs/images/LunarSequencer.png)
 
-A classic, Buchla-inspired 5-stage sequential voltage source: each step stores its own CV (0–100%, rescaled to volts by the CV Range setting) and its own gate on/off.
+A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step stores its own CV (0–100%, rescaled to volts by the CV Range setting) and its own gate on/off.
 
 **Knobs & switches**
-- **Pulser rate** — speed of the internal clock, used whenever nothing is patched into Clock In.
-- **Stages** — sets the sequence length to 3, 4, or 5 steps. ⚠️ Following the original SOLAR 42F hardware switch, the physical positions read (top to bottom) 4, 5, 3 rather than the more intuitive 3, 4, 5. Click directly on the side you want (rather than the current lever position) to jump straight there, like a real toggle switch.
+- **Pulser rate** — speed of the internal clock, used whenever nothing is patched into Clock In. The internal pulser is a clean ~50%-duty square wave (not a ramp/sawtooth) — same shape whether it's driving Clock Out or advancing the steps internally.
+- **Stages** — sets the sequence length to 3, 4, or 5 steps. ⚠️ Following the original SOLAR 42F hardware switch (a vertical lever read top to bottom as 4, 5, 3), this module's own horizontal switch reads left to right as **3, 5, 4** rather than the more intuitive 3, 4, 5. Click directly on the side you want (rather than the current lever position) to jump straight there, like a real toggle switch.
 - **Step 1–5 CV** — each step's output level; the knob's tooltip shows the actual voltage for the currently selected CV Range.
 - **Step 1–5 gate** (lit button) — enables/disables that step's Gate output. This does **not** affect the CV output — a "gate off" step is skipped for triggering, but its CV value still plays when the sequence reaches it.
 
