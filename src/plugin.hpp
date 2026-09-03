@@ -11,3 +11,6 @@ extern Model *modelLunarLFO;
 extern Model *modelLunarVCO;
 extern Model *modelLunarPapaSrapa;
 extern Model *modelLunarSequencer;
+extern Model *modelLunarJoystick;
+extern Model *modelLunarMixer;
+extern Model *modelLunarPads;

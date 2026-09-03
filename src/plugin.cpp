@@ -12,4 +12,7 @@ void init(Plugin *p) {
     p->addModel(modelLunarVCO);
     p->addModel(modelLunarPapaSrapa);
     p->addModel(modelLunarSequencer);
+    p->addModel(modelLunarJoystick);
+    p->addModel(modelLunarMixer);
+    p->addModel(modelLunarPads);
 }
