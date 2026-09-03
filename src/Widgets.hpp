@@ -137,3 +137,184 @@ struct SquareLight : WhiteLight {
         }
     }
 };
+
+// Square touch-pad control driving 2 params (X/Y) at once from a single
+// click+drag gesture, for modules that want one combined manual/CV position
+// control instead of 2 separate knobs (currently LunarJoystick). Not tied to
+// any specific module type: the owning ModuleWidget wires `getPosition`
+// (read the *effective* current value for axis 0=X/1=Y — same value the
+// module's own process() uses, e.g. LunarJoystick::axisPosition(), so the
+// crosshair never disagrees with what's actually driving the output) and
+// `setDragging` (flip a module-side "manual overrides CV while held" flag —
+// LunarJoystick::xyPadDragging). Deliberately not an app::ParamWidget: that
+// class assumes a single paramId per widget, which doesn't fit a control
+// that sets 2 params from one 2D position.
+//
+// Absolute-position dragging (click here = jump straight there, unlike a
+// Knob's relative-delta drag) is done the same way plugins/JW-Modules/src/
+// XYPad.cpp's own display widget does it: accumulate mouseDelta into a
+// local drag position rather than reading it in one shot, and divide by
+// getAbsoluteZoom() — Rack's DragMoveEvent delta is in screen pixels, so at
+// any canvas zoom other than 100% an unscaled delta drifts out of sync with
+// the actual cursor position.
+struct XYPad : widget::OpaqueWidget {
+    engine::Module* module = nullptr;
+    int paramIdX = -1, paramIdY = -1;
+    std::function<float(int axis)> getPosition; // axis: 0 = X, 1 = Y
+    std::function<void(bool)> setDragging;
+    float minValue = -5.f, maxValue = 5.f;
+
+    Vec dragPos;
+    float dragOldX = 0.f, dragOldY = 0.f;
+    // The 2nd press of a double-click still runs onButton (jump + start a
+    // drag) before onDoubleClick fires on top of it — without this flag,
+    // the reset would push its own history entry and then the same
+    // drag/click's onDragEnd would push a second, redundant one for what is
+    // really one user gesture.
+    bool suppressDragEndHistory = false;
+
+    void onButton(const widget::Widget::ButtonEvent& e) override {
+        OpaqueWidget::onButton(e);
+        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+            dragPos = e.pos;
+            if (module) {
+                dragOldX = module->params[paramIdX].getValue();
+                dragOldY = module->params[paramIdY].getValue();
+            }
+            if (setDragging) {
+                setDragging(true);
+            }
+            applyDragPos();
+        }
+    }
+
+    void onDragMove(const widget::Widget::DragMoveEvent& e) override {
+        if (e.button != GLFW_MOUSE_BUTTON_LEFT) {
+            return;
+        }
+        dragPos = dragPos.plus(e.mouseDelta.div(getAbsoluteZoom()));
+        applyDragPos();
+    }
+
+    void onDragEnd(const widget::Widget::DragEndEvent& e) override {
+        if (e.button != GLFW_MOUSE_BUTTON_LEFT) {
+            return;
+        }
+        if (setDragging) {
+            setDragging(false);
+        }
+        if (suppressDragEndHistory) {
+            suppressDragEndHistory = false;
+            return;
+        }
+        pushXYHistory("move XY pad", dragOldX, dragOldY);
+    }
+
+    // Same convention as app::ParamWidget::resetAction (src/Rack/src/app/
+    // ParamWidget.cpp) — double-click resets to the params' configured
+    // default value, which for X_PARAM/Y_PARAM is already the pad's center
+    // (0V), so this needs no special-cased "center" constant of its own.
+    void onDoubleClick(const widget::Widget::DoubleClickEvent& e) override {
+        if (!module) {
+            return;
+        }
+        float oldX = module->params[paramIdX].getValue();
+        float oldY = module->params[paramIdY].getValue();
+        engine::ParamQuantity* pqX = module->getParamQuantity(paramIdX);
+        engine::ParamQuantity* pqY = module->getParamQuantity(paramIdY);
+        if (pqX) {
+            pqX->reset();
+        }
+        if (pqY) {
+            pqY->reset();
+        }
+        // The 2nd click of the double-click is still physically held down
+        // when this fires (see onButton), so any further mouse movement
+        // before release still calls onDragMove — which was about to
+        // recompute the position from `dragPos`, still holding the click
+        // spot from *before* this reset. Re-sync it to the box center so
+        // the tiniest hand tremor during that still-held click doesn't snap
+        // the pad straight back to where it was clicked, undoing the reset
+        // before the mouse is even released.
+        dragPos = box.size.div(2.f);
+        pushXYHistory("reset XY pad", oldX, oldY);
+        suppressDragEndHistory = true;
+    }
+
+    // One combined undo step for both axes at once, same convention as
+    // app::Knob::onDragEnd (src/Rack/src/app/Knob.cpp) pushing a single
+    // history::ParamChange per drag rather than one per pixel moved.
+    void pushXYHistory(const std::string& name, float oldX, float oldY) {
+        if (!module) {
+            return;
+        }
+        float newX = module->params[paramIdX].getValue();
+        float newY = module->params[paramIdY].getValue();
+        if (oldX == newX && oldY == newY) {
+            return;
+        }
+        history::ComplexAction* complexAction = new history::ComplexAction;
+        complexAction->name = name;
+        if (oldX != newX) {
+            history::ParamChange* h = new history::ParamChange;
+            h->moduleId = module->id;
+            h->paramId = paramIdX;
+            h->oldValue = oldX;
+            h->newValue = newX;
+            complexAction->push(h);
+        }
+        if (oldY != newY) {
+            history::ParamChange* h = new history::ParamChange;
+            h->moduleId = module->id;
+            h->paramId = paramIdY;
+            h->oldValue = oldY;
+            h->newValue = newY;
+            complexAction->push(h);
+        }
+        APP->history->push(complexAction);
+    }
+
+    void applyDragPos() {
+        if (!module) {
+            return;
+        }
+        dragPos = dragPos.clamp(Rect(Vec(0.f, 0.f), box.size));
+        float nx = dragPos.x / box.size.x;
+        float ny = 1.f - dragPos.y / box.size.y; // screen Y grows downward, voltage grows upward
+        module->params[paramIdX].setValue(rescale(nx, 0.f, 1.f, minValue, maxValue));
+        module->params[paramIdY].setValue(rescale(ny, 0.f, 1.f, minValue, maxValue));
+    }
+
+    void draw(const widget::Widget::DrawArgs& args) override {
+        nvgBeginPath(args.vg);
+        nvgRect(args.vg, 0.f, 0.f, box.size.x, box.size.y);
+        nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0x30));
+        nvgFill(args.vg);
+        nvgStrokeColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0x50));
+        nvgStrokeWidth(args.vg, 1.f);
+        nvgStroke(args.vg);
+
+        float x = 0.f, y = 0.f;
+        if (getPosition) {
+            x = getPosition(0);
+            y = getPosition(1);
+        }
+        float px = rescale(x, minValue, maxValue, 0.f, box.size.x);
+        float py = rescale(y, minValue, maxValue, box.size.y, 0.f);
+
+        NVGcolor crossColor = nvgRGB(0xff, 0xff, 0xff);
+        nvgStrokeColor(args.vg, crossColor);
+        nvgStrokeWidth(args.vg, 1.f);
+        nvgBeginPath(args.vg);
+        nvgMoveTo(args.vg, 0.f, py);
+        nvgLineTo(args.vg, box.size.x, py);
+        nvgMoveTo(args.vg, px, 0.f);
+        nvgLineTo(args.vg, px, box.size.y);
+        nvgStroke(args.vg);
+
+        nvgFillColor(args.vg, crossColor);
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, px, py, 2.5f);
+        nvgFill(args.vg);
+    }
+};
