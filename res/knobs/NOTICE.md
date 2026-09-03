@@ -12,3 +12,7 @@ https://github.com/ValleyAudio/ValleyRackFree).
   by recoloring only that face disc (`#f2f2f2` -> `#141414`); the shared
   white-to-grey gloss gradient underneath and the drop shadow are unchanged,
   giving a black face with the same bright bezel ring as the white knob.
+- `Rogan1PSRedSmall.svg`, `Rogan1PSSmall-bg.svg`, `Rogan1PSRedSmall-fg.svg`:
+  copied unmodified from Valley's smaller "Small" size tier (~5.2mm vs the
+  ~8.4mm "MedSmall" tier above) — the same knob Plateau uses for its
+  "Predelay" control. Used by LunarJoystick's range-selector knob.

@@ -27,6 +27,32 @@ struct RoganMedSmallBlack : Rogan {
     }
 };
 
+// Same small-diameter red Rogan Valley/Plateau uses for its "Predelay" knob
+// (RoganSmallRed in plugins/ValleyAudio/src/gui/ValleyComponents.hpp:140-146)
+// — ~5.2mm, noticeably smaller than the stock Rogan1PSRed (~10.5mm) or even
+// RoganMedSmallWhite/Black above (~8.4mm). See res/knobs/NOTICE.md.
+struct RoganSmallRed : Rogan {
+    RoganSmallRed() {
+        setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSRedSmall.svg")));
+        bg->setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSSmall-bg.svg")));
+        fg->setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSRedSmall-fg.svg")));
+    }
+};
+
+// LunarJoystick's CV input-range selector (4 detents, paired with
+// configSwitch so it snaps — see Knob::onDragMove in the Rack SDK, which
+// reads ParamQuantity::snapEnabled rather than a widget-level flag). Same
+// art as RoganSmallRed, just confined to a tight left-side arc instead of
+// Rogan's default near-full-circle sweep (-0.83pi..0.83pi), so all 4
+// positions land on the left (9 o'clock-ish) — Neil wants the range labels
+// printed to the left of the knob, pointer aimed at each in turn.
+struct RoganRangeSelector : RoganSmallRed {
+    RoganRangeSelector() {
+        minAngle = -0.75f * (float)M_PI;
+        maxAngle = -0.25f * (float)M_PI;
+    }
+};
+
 // Square, near-black trigger pad (LunarPads "Drone Voices" grid) reproducing
 // the SOLAR 42F hardware's pushbutton look, since every stock Rack SDK
 // button/bezel (VCVButton, TL1105, CKD6, VCVBezel...) is round. Same
@@ -176,7 +202,7 @@ struct XYPad : widget::OpaqueWidget {
     void onButton(const widget::Widget::ButtonEvent& e) override {
         OpaqueWidget::onButton(e);
         if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            dragPos = e.pos;
+            dragPos = e.pos; // always inside: Rack only delivers the press to the widget actually under the cursor
             if (module) {
                 dragOldX = module->params[paramIdX].getValue();
                 dragOldY = module->params[paramIdY].getValue();
@@ -184,7 +210,7 @@ struct XYPad : widget::OpaqueWidget {
             if (setDragging) {
                 setDragging(true);
             }
-            applyDragPos();
+            setPosFromPixels(dragPos);
         }
     }
 
@@ -192,8 +218,21 @@ struct XYPad : widget::OpaqueWidget {
         if (e.button != GLFW_MOUSE_BUTTON_LEFT) {
             return;
         }
-        dragPos = dragPos.plus(e.mouseDelta.div(getAbsoluteZoom()));
-        applyDragPos();
+        Vec oldPos = dragPos; // raw position before this delta, may itself be outside if already frozen
+        Vec newPos = oldPos.plus(e.mouseDelta.div(getAbsoluteZoom()));
+        dragPos = newPos; // keep tracking the real cursor even while outside, so re-entry resumes from it exactly
+
+        if (isInsideBox(newPos)) {
+            setPosFromPixels(newPos);
+        }
+        else if (isInsideBox(oldPos)) {
+            // Just crossed out this frame: freeze exactly where the
+            // oldPos->newPos line crosses the box edge, rather than at
+            // oldPos itself (which can lag behind on a fast drag) or at the
+            // nearest edge point ignoring the drag's actual direction.
+            setPosFromPixels(clipExitPoint(oldPos, newPos));
+        }
+        // else: was already outside and still is — stay frozen, nothing to apply.
     }
 
     void onDragEnd(const widget::Widget::DragEndEvent& e) override {
@@ -274,13 +313,41 @@ struct XYPad : widget::OpaqueWidget {
         APP->history->push(complexAction);
     }
 
-    void applyDragPos() {
+    bool isInsideBox(Vec p) const {
+        return p.x >= 0.f && p.x <= box.size.x && p.y >= 0.f && p.y <= box.size.y;
+    }
+
+    // `from` must be inside the box; `to` may not be. Returns the point
+    // where segment from->to first crosses the box edge (Liang-Barsky,
+    // simplified for a box starting at the origin) — i.e. the actual pixel
+    // where the cursor left the sensitive zone, not just wherever `from`
+    // happened to be sampled.
+    Vec clipExitPoint(Vec from, Vec to) const {
+        float dx = to.x - from.x;
+        float dy = to.y - from.y;
+        float t = 1.f;
+        if (dx > 0.f) {
+            t = std::min(t, (box.size.x - from.x) / dx);
+        }
+        else if (dx < 0.f) {
+            t = std::min(t, (0.f - from.x) / dx);
+        }
+        if (dy > 0.f) {
+            t = std::min(t, (box.size.y - from.y) / dy);
+        }
+        else if (dy < 0.f) {
+            t = std::min(t, (0.f - from.y) / dy);
+        }
+        t = clamp(t, 0.f, 1.f);
+        return Vec(from.x + t * dx, from.y + t * dy);
+    }
+
+    void setPosFromPixels(Vec p) {
         if (!module) {
             return;
         }
-        dragPos = dragPos.clamp(Rect(Vec(0.f, 0.f), box.size));
-        float nx = dragPos.x / box.size.x;
-        float ny = 1.f - dragPos.y / box.size.y; // screen Y grows downward, voltage grows upward
+        float nx = p.x / box.size.x;
+        float ny = 1.f - p.y / box.size.y; // screen Y grows downward, voltage grows upward
         module->params[paramIdX].setValue(rescale(nx, 0.f, 1.f, minValue, maxValue));
         module->params[paramIdY].setValue(rescale(ny, 0.f, 1.f, minValue, maxValue));
     }

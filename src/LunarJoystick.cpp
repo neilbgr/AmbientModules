@@ -16,8 +16,6 @@ struct LunarJoystick : Module {
     static constexpr float RANGES[4][2] = { {-5.f, 5.f}, {0.f, 10.f}, {0.f, 5.f}, {-10.f, 10.f} };
     static const int RANGE_DEFAULT = 1; // 0V to +10V (MIDI CC)
 
-    int rangeX = RANGE_DEFAULT;
-    int rangeY = RANGE_DEFAULT;
     // Runtime-only (not persisted, like LunarPads::individualLatch): true
     // while the XYPad is actively being dragged, forcing manual position to
     // win over a patched CV on both axes for the duration of that one 2D
@@ -29,6 +27,8 @@ struct LunarJoystick : Module {
         Y_PARAM,
         X_OFFSET_PARAM,
         Y_OFFSET_PARAM,
+        RANGE_X_PARAM,
+        RANGE_Y_PARAM,
         NUM_PARAMS
     };
     enum InputIds {
@@ -48,26 +48,22 @@ struct LunarJoystick : Module {
         configParam(Y_PARAM, -5.f, 5.f, 0.f, "Y position (manual, used when Y In isn't patched)", "V");
         configParam(X_OFFSET_PARAM, -5.f, 5.f, 0.f, "X offset", "V");
         configParam(Y_OFFSET_PARAM, -5.f, 5.f, 0.f, "Y offset", "V");
-        configInput(X_INPUT, "X input (choose your range in the context menu)");
-        configInput(Y_INPUT, "Y input (choose your range in the context menu)");
+        static const std::vector<std::string> rangeLabels = {
+            "-5V to +5V", "0V to +10V (ie: MIDI CC)", "0V to +5V", "-10V to +10V"
+        };
+        configSwitch(RANGE_X_PARAM, 0.f, 3.f, RANGE_DEFAULT, "Input range X", rangeLabels);
+        configSwitch(RANGE_Y_PARAM, 0.f, 3.f, RANGE_DEFAULT, "Input range Y", rangeLabels);
+        configInput(X_INPUT, "X (overrides the X knob when patched)");
+        configInput(Y_INPUT, "Y (overrides the Y knob when patched)");
         configOutput(X_OUTPUT, "X");
         configOutput(Y_OUTPUT, "Y");
     }
 
-    json_t* dataToJson() override {
-        json_t* rootJ = json_object();
-        json_object_set_new(rootJ, "rangeX", json_integer(rangeX));
-        json_object_set_new(rootJ, "rangeY", json_integer(rangeY));
-        return rootJ;
-    }
-
-    void dataFromJson(json_t* rootJ) override {
-        if (json_t* j = json_object_get(rootJ, "rangeX")) {
-            rangeX = json_integer_value(j);
-        }
-        if (json_t* j = json_object_get(rootJ, "rangeY")) {
-            rangeY = json_integer_value(j);
-        }
+    // Same defensive rounding as LunarSequencer's STAGES_PARAM read
+    // (LunarSequencer.cpp) — configSwitch's snapEnabled already keeps the
+    // param itself on an exact integer, this just guards the cast.
+    static int rangeIndex(Param& p) {
+        return clamp((int)std::round(p.getValue()), 0, 3);
     }
 
     // Input and knob/pad are mutually exclusive, never summed: once a CV is
@@ -98,8 +94,8 @@ struct LunarJoystick : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float x = axisPosition(inputs[X_INPUT], params[X_PARAM], rangeX, xyPadDragging) + params[X_OFFSET_PARAM].getValue();
-        float y = axisPosition(inputs[Y_INPUT], params[Y_PARAM], rangeY, xyPadDragging) + params[Y_OFFSET_PARAM].getValue();
+        float x = axisPosition(inputs[X_INPUT], params[X_PARAM], rangeIndex(params[RANGE_X_PARAM]), xyPadDragging) + params[X_OFFSET_PARAM].getValue();
+        float y = axisPosition(inputs[Y_INPUT], params[Y_PARAM], rangeIndex(params[RANGE_Y_PARAM]), xyPadDragging) + params[Y_OFFSET_PARAM].getValue();
         outputs[X_OUTPUT].setVoltage(x);
         outputs[Y_OUTPUT].setVoltage(y);
     }
@@ -138,8 +134,8 @@ struct LunarJoystickWidget : ModuleWidget {
                 return 0.f;
             }
             return axis == 0
-                ? LunarJoystick::axisPosition(module->inputs[LunarJoystick::X_INPUT], module->params[LunarJoystick::X_PARAM], module->rangeX, module->xyPadDragging)
-                : LunarJoystick::axisPosition(module->inputs[LunarJoystick::Y_INPUT], module->params[LunarJoystick::Y_PARAM], module->rangeY, module->xyPadDragging);
+                ? LunarJoystick::axisPosition(module->inputs[LunarJoystick::X_INPUT], module->params[LunarJoystick::X_PARAM], LunarJoystick::rangeIndex(module->params[LunarJoystick::RANGE_X_PARAM]), module->xyPadDragging)
+                : LunarJoystick::axisPosition(module->inputs[LunarJoystick::Y_INPUT], module->params[LunarJoystick::Y_PARAM], LunarJoystick::rangeIndex(module->params[LunarJoystick::RANGE_Y_PARAM]), module->xyPadDragging);
         };
         xyPad->setDragging = [module](bool dragging) {
             if (module) {
@@ -148,19 +144,22 @@ struct LunarJoystickWidget : ModuleWidget {
         };
         addChild(xyPad);
 
-        const float xL = 11.89693f;
-        const float xR = 33.82307f;
-        const float yIn = 72.f;
-        const float yOffset = 89.f;
-        const float yOut = 107.95455f;
+        const float col0 = 11.89693f;
+        const float col1 = 33.82307f;
+        const float row0 = 68.40075f;
+        const float row1 = 80.5f;
+        const float row2 = 93.76147f;
+        const float row3 = 110.65000f;
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xL, yIn)), module, LunarJoystick::X_INPUT));
-        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(xL, yOffset)), module, LunarJoystick::X_OFFSET_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xL, yOut)), module, LunarJoystick::X_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(col0, row0)), module, LunarJoystick::X_INPUT));
+        addParam(createParamCentered<RoganRangeSelector>(mm2px(Vec(col0, row1)), module, LunarJoystick::RANGE_X_PARAM));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(col0, row2)), module, LunarJoystick::X_OFFSET_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(col0, row3)), module, LunarJoystick::X_OUTPUT));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, yIn)), module, LunarJoystick::Y_INPUT));
-        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(xR, yOffset)), module, LunarJoystick::Y_OFFSET_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, yOut)), module, LunarJoystick::Y_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(col1, row0)), module, LunarJoystick::Y_INPUT));
+        addParam(createParamCentered<RoganRangeSelector>(mm2px(Vec(col1, row1)), module, LunarJoystick::RANGE_Y_PARAM));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(col1, row2)), module, LunarJoystick::Y_OFFSET_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(col1, row3)), module, LunarJoystick::Y_OUTPUT));
     }
 
     void step() override {
@@ -172,45 +171,11 @@ struct LunarJoystickWidget : ModuleWidget {
         LunarJoystick* module = dynamic_cast<LunarJoystick*>(this->module);
         assert(module);
 
+        // Input range X/Y used to be menu-only submenus here — now physical
+        // RoganRangeSelector knobs on the panel (RANGE_X_PARAM/RANGE_Y_PARAM),
+        // right-clickable individually like any other param for the same
+        // per-axis choice.
         appendAmbientThemeMenu(menu);
-
-        static const std::vector<std::string> rangeLabels = {
-            "-5V to +5V", "0V to +10V (ie: MIDI CC)", "0V to +5V", "-10V to +10V"
-        };
-
-        menu->addChild(createIndexSubmenuItem("Input range X", rangeLabels,
-            [=]() { return module->rangeX; },
-            [=](int index) {
-                pushIntFieldChange(module, "change X input range", module->rangeX, index,
-                    [](engine::Module* m, int v) { dynamic_cast<LunarJoystick*>(m)->rangeX = v; });
-                module->rangeX = index;
-            }
-        ));
-        menu->addChild(createIndexSubmenuItem("Input range Y", rangeLabels,
-            [=]() { return module->rangeY; },
-            [=](int index) {
-                pushIntFieldChange(module, "change Y input range", module->rangeY, index,
-                    [](engine::Module* m, int v) { dynamic_cast<LunarJoystick*>(m)->rangeY = v; });
-                module->rangeY = index;
-            }
-        ));
-        // Convenience shortcut applying the same choice to both axes at once —
-        // no separate persisted "linked" state, just sets both fields.
-        menu->addChild(createIndexSubmenuItem("Input range (both)", rangeLabels,
-            [=]() { return module->rangeX; },
-            [=](int index) {
-                if (module->rangeX != index) {
-                    pushIntFieldChange(module, "change X input range", module->rangeX, index,
-                        [](engine::Module* m, int v) { dynamic_cast<LunarJoystick*>(m)->rangeX = v; });
-                    module->rangeX = index;
-                }
-                if (module->rangeY != index) {
-                    pushIntFieldChange(module, "change Y input range", module->rangeY, index,
-                        [](engine::Module* m, int v) { dynamic_cast<LunarJoystick*>(m)->rangeY = v; });
-                    module->rangeY = index;
-                }
-            }
-        ));
     }
 };
 
