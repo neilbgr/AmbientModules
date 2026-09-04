@@ -12,6 +12,9 @@
 | [LunarPapaSrapa](#lunarpapasrapa) | FM/AM cross-modulated noise/drone voice            | Drone voices 3, 6 "Papa Srapa"             |
 | [LunarLFO](#lunarlfo)             | Dual unipolar triangle/square LFO                  | LFOs                                       |
 | [LunarSequencer](#lunarsequencer) | 3-to-5-stage Buchla-inspired CV/gate sequencer     | Sequencer                                  |
+| [LunarPads](#lunarpads)           | 6-pad momentary/latching gate source for the drone voices | "DRONE KEYS" pushbutton grid        |
+| [LunarMixer](#lunarmixer)         | 9-channel panoramic mixer with master level        | Mixer page                                 |
+| [LunarJoystick](#lunarjoystick)   | Draggable XY pad / CV position source, per-axis range + offset | Joystick block                  |
 
 ## Table of Contents
 
@@ -24,6 +27,9 @@
 - [LunarLFO](#lunarlfo)
 - [LunarPapaSrapa](#lunarpapasrapa)
 - [LunarSequencer](#lunarsequencer)
+- [LunarPads](#lunarpads)
+- [LunarMixer](#lunarmixer)
+- [LunarJoystick](#lunarjoystick)
 - [Blank](#blank)
 
 ## Videos
@@ -59,13 +65,13 @@ The full rack of AmbientModules modules, side by side, in each of the 5 availabl
 
 ## Right-click menu
 
-Right-click any AmbientModules module to open its context menu. One entry is identical across all 6 modules:
+Right-click any AmbientModules module to open its context menu. One entry is identical across all 9 modules:
 
 - **Theme** — a submenu to switch the pack-wide panel theme between Cream / Black / Pink / Yellow / Blue (see [Panel themes](#panel-themes) above — it's not specific to the module you right-clicked).
 
 ![Theme submenu](docs/images/Menu_Themes.png)
 
-Some modules add extra entries of their own — those are documented under the module in question ([Lunar50Drone](#lunar50drone-context-menu), [LunarLFO](#lunarlfo-context-menu), [LunarSequencer](#lunarsequencer-context-menu)). LunarVCO, LunarPapaSrapa, and Blank have no module-specific entries.
+Some modules add extra entries of their own — those are documented under the module in question ([Lunar50Drone](#lunar50drone-context-menu), [LunarLFO](#lunarlfo-context-menu), [LunarSequencer](#lunarsequencer-context-menu), [LunarPads](#lunarpads-context-menu)). LunarVCO, LunarPapaSrapa, LunarMixer, LunarJoystick, and Blank have no module-specific entries.
 
 ## Shared conventions
 
@@ -251,6 +257,75 @@ A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step sto
 **Patch ideas**
 - Feed Step CV into [LunarVCO](#lunarvco) or [Lunar50Drone](#lunar50drone)'s pitch/frequency input, and Step gate into their Gate input, for a self-contained melodic sequence.
 - Chain two LunarSequencers by patching one's Clock Out into the other's Clock In to build longer combined patterns.
+
+## LunarPads
+
+![LunarPads panel](docs/images/LunarPads.png)
+
+The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 drone voices (Drone 1/2/4/5 = [Lunar50Drone](#lunar50drone) "Classic Solar 50", Drone 3/6 = [LunarPapaSrapa](#lunarpapasrapa)). VCO A/B aren't covered here — they already have their own gate/envelope, driven by the touch keyboard on the real hardware.
+
+**Pads**
+- **Drone 1–6** (square pad + LED) — triggers that drone voice's gate: momentary by default (gate high only while held, matching the hardware's pushbutton keyboard) or latching (a click toggles it on/off, like a mute button) depending on the Latch mode menu setting below.
+- **Ctrl+click** holds one pad down like a second finger, independently of the Latch mode setting — even with Latch mode off (so every other pad still springs back on release), Ctrl-clicking a pad keeps that one held until it's clicked again (with or without Ctrl). A plain click on any pad releases every *other* pad currently held this way, file-explorer-selection style, so you can sustain one or two voices by hand while triggering the rest normally.
+
+**Inputs**
+- **Drone 1–6 external gate** — ORs into that pad's own gate (e.g. from MIDI), regardless of Latch mode, so an external source can trigger it alongside the mouse.
+
+**Outputs**
+- **Drone 1–6 gate** — 0/10V logic level, high whenever that pad or its external gate input is active.
+
+<a id="lunarpads-context-menu"></a>
+**Context menu**
+- **Latch mode** — unchecked (default): pads are momentary. Checked: clicking a pad toggles it on/off instead of requiring it to be held.
+
+**Patch ideas**
+- Patch the gate outputs here into [Lunar50Drone](#lunar50drone)/[LunarPapaSrapa](#lunarpapasrapa)'s Gate input to trigger those drones from this shared pad grid instead of each module's own Gate jack.
+- Turn on Latch mode and Ctrl+click a couple of pads to build a sustained drone, then trigger the rest momentarily on top for accents.
+
+## LunarMixer
+
+![LunarMixer panel](docs/images/LunarMixer.png)
+
+The SOLAR 42F's 9-channel panoramic mixer page: one row per channel (In / Level / Pan), summed to a shared stereo output with a master level knob. Straight sum, no automatic gain compensation or soft-clipping — same as the hardware mixer page and the standard Eurorack mixer convention, so gain-stage with the Level knobs directly.
+
+**Knobs**
+- **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6 level** — one knob per channel, 0–100%.
+- **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6 pan** — constant-power pan per channel, hard left to hard right.
+- **Master level** — overall output level after the pan/sum stage.
+
+**Inputs**
+- **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6** — one audio input per channel. A polyphonic cable is summed to mono before that channel's own Level/Pan (same convention as Bogaudio's Mix4 and Venom/MindMeld MixMaster's "poly sum" mode) — each channel has a single pair of knobs, not one per polyphonic voice. "Ext. Audio/Preamp" is a general-purpose channel for anything else you want to mix in; on the real hardware it's mutually exclusive with the internal piezo preamp, a distinction that doesn't apply here.
+
+**Outputs**
+- **Left / Right** — the summed, panned, master-level-scaled stereo mix.
+
+**Patch ideas**
+- Feed [Lunar50Drone](#lunar50drone), [LunarVCO](#lunarvco) (into VCO A and VCO B), and [LunarPapaSrapa](#lunarpapasrapa) (into Drone 3 and Drone 6) into their matching channels here for one shared stereo output with independent level/pan per voice.
+
+## LunarJoystick
+
+![LunarJoystick panel](docs/images/LunarJoystick.png)
+
+Electrical equivalent of the SOLAR 42F Joystick block, without the physical stick: a draggable XY pad producing independent X/Y position voltages, each either manual (drag the pad) or driven by an external CV, plus a per-axis input-range selector and offset — matching the 3 example ranges in the original manual (offset left/center/right → -10V to 0V / -5V to +5V / 0V to +10V).
+
+**XY pad**
+- Click or click-drag anywhere in the square to set X and Y at once — the crosshair jumps straight to wherever you click, unlike a knob's relative turn-style drag. Double-click resets both axes to center (0V).
+- While a CV is patched into X In or Y In, that CV drives the corresponding axis instead of the pad — except for the instant you're actively dragging the pad, which briefly takes manual control back so you can override CV in real time; it reverts to CV as soon as you release the mouse.
+- If the cursor leaves the square on either axis mid-drag, the crosshair freezes exactly where it crossed the edge rather than sliding along it — further mouse movement outside the zone is ignored until the cursor comes back inside on both axes.
+
+**Knobs**
+- **X/Y offset** — adds to that axis's position (manual or CV) after the range rescale below, so it's independent of whichever range is selected.
+- **Range X/Y** (4-position rotary) — the voltage range an external CV source is rescaled from, into the pad's internal ±5V range: *-5V to +5V*, *0V to +10V* (default — e.g. a MIDI CC→CV converter, always unipolar 0–10V), *0V to +5V*, or *-10V to +10V*. CV outside the selected range is clamped to ±5V internally, same as a manual drag can never exceed.
+
+**Inputs**
+- **X / Y** — CV overriding the pad's manual position on that axis when patched (see above).
+
+**Outputs**
+- **X / Y** — the resulting position (manual or CV, rescaled by Range X/Y) plus that axis's offset knob.
+
+**Patch ideas**
+- Patch X and Y into two parameters you want to move together by hand (e.g. [Lunar50Drone](#lunar50drone)'s Volt and [LunarVCO](#lunarvco)'s Shape) for a single 2D "macro" control.
+- Feed a slow [LunarLFO](#lunarlfo) into X or Y In (Range set to match the LFO's own output range) for a hands-off wandering position you can still grab and override by hand at any time.
 
 ## Blank
 
