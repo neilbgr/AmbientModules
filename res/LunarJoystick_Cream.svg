@@ -54,8 +54,8 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      inkscape:zoom="6.646498"
-     inkscape:cx="84.405351"
-     inkscape:cy="299.48102"
+     inkscape:cx="84.405352"
+     inkscape:cy="323.55385"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
@@ -723,7 +723,7 @@
      inkscape:label="TRIG"
      aria-label="10" />
   <text
-     x="7.269598"
+     x="7.5294275"
      y="84.733299"
      font-family="sans-serif"
      font-size="2"
@@ -734,15 +734,9 @@
      style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"><tspan
        sodipodi:role="line"
        id="tspan64"
-       x="7.1769938"
+       x="7.4368234"
        y="84.733299"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:-0.185208px;fill:#000000">-5</tspan></text>
-  <path
-     d="m 6.4883522,84.278546 v -0.187069 h 0.5715422 v 0.187069 z m 0.5403303,0.05788 0.1953372,-0.01654 q 0.021704,0.142627 0.1002524,0.214974 0.079582,0.07131 0.1912031,0.07131 0.1343589,0 0.2273767,-0.101286 0.093018,-0.101286 0.093018,-0.268718 0,-0.159163 -0.089917,-0.251148 -0.088884,-0.09198 -0.2335778,-0.09198 -0.089917,0 -0.1622642,0.04134 -0.072347,0.04031 -0.1136884,0.10542 L 7.0617554,84.017058 7.2085167,83.23881 h 0.7534436 v 0.177767 H 7.3573451 l -0.081649,0.407211 q 0.136426,-0.09508 0.2862879,-0.09508 0.1984378,0 0.3348638,0.137459 0.1364259,0.13746 0.1364259,0.353468 0,0.205672 -0.1198895,0.355534 -0.1457277,0.183969 -0.3979091,0.183969 -0.206706,0 -0.3379644,-0.115756 -0.1302248,-0.115755 -0.1488283,-0.306958 z"
-     id="path65"
-     style="font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"
-     inkscape:label="TRIG"
-     aria-label="-5" />
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:-0.185208px;fill:#000000">5</tspan></text>
   <text
      x="25.730042"
      y="77.885666"
@@ -819,7 +813,7 @@
        y="81.25972"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;fill:#000000">-5 5</tspan></text>
   <text
-     x="29.384501"
+     x="29.38451"
      y="80.168213"
      font-family="sans-serif"
      font-size="2"
@@ -830,11 +824,11 @@
      style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"><tspan
        sodipodi:role="line"
        id="tspan70"
-       x="29.291897"
+       x="29.291906"
        y="80.168213"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:-0.185208px;fill:#000000">5</tspan></text>
   <text
-     x="28.905045"
+     x="28.905054"
      y="77.885666"
      font-family="sans-serif"
      font-size="2"
@@ -845,11 +839,11 @@
      style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"><tspan
        sodipodi:role="line"
        id="tspan71"
-       x="28.812441"
+       x="28.81245"
        y="77.885666"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:-0.185208px;fill:#000000">10</tspan></text>
   <text
-     x="28.905045"
+     x="28.905054"
      y="82.450752"
      font-family="sans-serif"
      font-size="2"
@@ -860,7 +854,7 @@
      style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"><tspan
        sodipodi:role="line"
        id="tspan72"
-       x="28.812441"
+       x="28.81245"
        y="82.450752"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:-0.185208px;fill:#000000">10</tspan></text>
   <path
@@ -894,7 +888,7 @@
      inkscape:label="TRIG"
      aria-label="-5 5" />
   <path
-     d="m 28.88376,79.771337 0.195337,-0.01654 q 0.0217,0.142627 0.100252,0.214974 0.07958,0.07131 0.191204,0.07131 0.134359,0 0.227376,-0.101286 0.09302,-0.101286 0.09302,-0.268718 0,-0.159164 -0.08992,-0.251148 -0.08888,-0.09198 -0.233577,-0.09198 -0.08992,0 -0.162265,0.04134 -0.07235,0.04031 -0.113688,0.10542 l -0.174667,-0.02274 0.146761,-0.778248 h 0.753444 v 0.177767 h -0.604615 l -0.08165,0.407211 q 0.136425,-0.09508 0.286287,-0.09508 0.198438,0 0.334864,0.137459 0.136426,0.13746 0.136426,0.353467 0,0.205673 -0.119889,0.355535 -0.145728,0.183968 -0.397909,0.183968 -0.206706,0 -0.337965,-0.115755 -0.130224,-0.115753 -0.148826,-0.306956 z"
+     d="m 28.883767,79.771337 0.195337,-0.01654 q 0.0217,0.142627 0.100252,0.214974 0.07958,0.07131 0.191204,0.07131 0.134359,0 0.227376,-0.101286 0.09302,-0.101286 0.09302,-0.268718 0,-0.159164 -0.08992,-0.251148 -0.08888,-0.09198 -0.233577,-0.09198 -0.08992,0 -0.162265,0.04134 -0.07235,0.04031 -0.113688,0.10542 l -0.174667,-0.02274 0.146761,-0.778248 h 0.753444 v 0.177767 h -0.604615 l -0.08165,0.407211 q 0.136425,-0.09508 0.286287,-0.09508 0.198438,0 0.334864,0.137459 0.136426,0.13746 0.136426,0.353467 0,0.205673 -0.119889,0.355535 -0.145728,0.183968 -0.397909,0.183968 -0.206706,0 -0.337965,-0.115755 -0.130224,-0.115753 -0.148826,-0.306956 z"
      id="path78"
      style="font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"
      inkscape:label="TRIG"
@@ -911,25 +905,31 @@
      style="font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"
      inkscape:label="TRIG"
      aria-label="10" />
+  <path
+     d="m 7.0286821,84.336424 0.1953372,-0.01654 q 0.021704,0.142627 0.1002525,0.214974 0.079582,0.07131 0.1912031,0.07131 0.1343589,0 0.2273766,-0.101286 0.093018,-0.101286 0.093018,-0.268718 0,-0.159163 -0.089917,-0.251148 -0.088884,-0.09198 -0.2335778,-0.09198 -0.089917,0 -0.1622643,0.04134 -0.072347,0.04031 -0.1136883,0.10542 l -0.1746666,-0.02274 0.1467613,-0.778248 h 0.7534435 v 0.177767 H 7.3573447 l -0.081649,0.407211 q 0.1364259,-0.09508 0.2862878,-0.09508 0.1984378,0 0.3348638,0.137459 0.136426,0.13746 0.136426,0.353468 0,0.205672 -0.1198895,0.355534 -0.1457278,0.183969 -0.3979091,0.183969 -0.2067061,0 -0.3379644,-0.115756 -0.1302248,-0.115755 -0.1488284,-0.306958 z"
+     id="text2"
+     style="font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"
+     inkscape:label="TRIG"
+     aria-label="5" />
   <text
-     x="29.124672"
+     x="29.38451"
      y="84.733299"
      font-family="sans-serif"
      font-size="2"
      text-anchor="middle"
      fill="#1a1a1a"
-     id="text80"
+     id="text4"
      inkscape:label="TRIG"
      style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"><tspan
        sodipodi:role="line"
-       id="tspan80"
-       x="29.032068"
+       id="tspan2"
+       x="29.291906"
        y="84.733299"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:-0.185208px;fill:#000000">-5</tspan></text>
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;letter-spacing:-0.185208px;fill:#000000">5</tspan></text>
   <path
-     d="m 28.343429,84.278546 v -0.187069 h 0.571543 v 0.187069 z m 0.540331,0.05788 0.195337,-0.01654 q 0.0217,0.142627 0.100252,0.214974 0.07958,0.07131 0.191204,0.07131 0.134359,0 0.227376,-0.101286 0.09302,-0.101286 0.09302,-0.268718 0,-0.159163 -0.08992,-0.251148 -0.08888,-0.09198 -0.233577,-0.09198 -0.08992,0 -0.162265,0.04134 -0.07235,0.04031 -0.113688,0.10542 l -0.174666,-0.02274 0.146761,-0.778248 h 0.753444 v 0.177767 h -0.604615 l -0.08165,0.407211 q 0.136426,-0.09508 0.286287,-0.09508 0.198438,0 0.334865,0.137459 0.136425,0.13746 0.136425,0.353468 0,0.205672 -0.119889,0.355534 -0.145728,0.183969 -0.397909,0.183969 -0.206706,0 -0.337965,-0.115756 -0.130225,-0.115755 -0.148828,-0.306958 z"
-     id="path81"
+     d="m 28.883766,84.336424 0.195337,-0.01654 q 0.0217,0.142627 0.100253,0.214974 0.07958,0.07131 0.191203,0.07131 0.134359,0 0.227377,-0.101286 0.09302,-0.101286 0.09302,-0.268718 0,-0.159163 -0.08992,-0.251148 -0.08888,-0.09198 -0.233578,-0.09198 -0.08992,0 -0.162264,0.04134 -0.07235,0.04031 -0.113689,0.10542 l -0.174665,-0.02274 0.146761,-0.778248 h 0.753444 v 0.177767 h -0.604616 l -0.08165,0.407211 q 0.136425,-0.09508 0.286287,-0.09508 0.198438,0 0.334864,0.137459 0.136426,0.13746 0.136426,0.353468 0,0.205672 -0.119889,0.355534 -0.145729,0.183969 -0.39791,0.183969 -0.206705,0 -0.337964,-0.115756 -0.130224,-0.115755 -0.148828,-0.306958 z"
+     id="path7"
      style="font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:center;letter-spacing:-0.185208px;text-anchor:middle;fill:#000000"
      inkscape:label="TRIG"
-     aria-label="-5" />
+     aria-label="5" />
 </svg>
