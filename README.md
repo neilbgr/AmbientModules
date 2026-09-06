@@ -325,7 +325,7 @@ The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 dro
 
 **Pads**
 - **Drone 1–6** (square pad + LED) — triggers that drone voice's gate: momentary by default (gate high only while held, matching the hardware's pushbutton keyboard) or latching (a click toggles it on/off, like a mute button) depending on the Latch mode menu setting below.
-- **Ctrl+click** holds one pad down like a second finger, independently of the Latch mode setting — even with Latch mode off (so every other pad still springs back on release), Ctrl-clicking a pad keeps that one held until it's clicked again (with or without Ctrl). A plain click on any pad releases every *other* pad currently held this way, file-explorer-selection style, so you can sustain one or two voices by hand while triggering the rest normally.
+- **Ctrl+click** holds one pad down like a second finger, independently of the Latch mode setting — even with Latch mode off (so every other pad still springs back on release), Ctrl-clicking a pad keeps that one held until it's clicked again (with or without Ctrl). Ctrl is checked at release, not at press, so a plain press can still be turned into a hold by pressing Ctrl before letting go. Pressing down on a new pad immediately releases every *other* pad currently held this way, unless Ctrl is also held at that instant — file-explorer-selection style, so you can sustain one or two voices by hand while triggering the rest normally.
 
 **Inputs**
 - **Drone 1–6 external gate** — ORs into that pad's own gate (e.g. from MIDI), regardless of Latch mode, so an external source can trigger it alongside the mouse.

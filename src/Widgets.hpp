@@ -62,15 +62,11 @@ struct RoganRangeSelector : RoganSmallRed {
 // class, toggled live in LunarPadsWidget::step() same as it did for the
 // previous VCVLightBezel.
 struct SquarePad : app::SvgSwitch {
-    // Set from the most recent left-button press (onButton carries mouse
-    // modifiers; onDragStart doesn't), so onDragStart can tell a Ctrl+click
-    // apart from a plain one.
-    bool ctrlHeld = false;
     // True while this one pad is being held down "by hand" via Ctrl+click,
     // overriding `momentary` for this pad only so a second pad can still be
     // pressed/released normally at the same time (simulates a second
     // finger). Cleared as soon as the pad goes back to off, whichever way
-    // that happens — see onDragStart below and LunarPadsWidget::step().
+    // that happens — see onDragEnd below and LunarPadsWidget::step().
     bool individualLatch = false;
     // Wired by the owning ModuleWidget (LunarPadsWidget) to release any
     // *other* pad currently held via Ctrl+click, file-explorer-selection
@@ -92,34 +88,54 @@ struct SquarePad : app::SvgSwitch {
         shadow = nullptr;
     }
 
-    void onButton(const widget::Widget::ButtonEvent& e) override {
-        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            ctrlHeld = (e.mods & RACK_MOD_MASK) == RACK_MOD_CTRL;
-        }
-        SvgSwitch::onButton(e);
-    }
-
+    // Releasing any *other* Ctrl-held pad (file-explorer-style "select only
+    // this one") happens right away at mousedown, not delayed until this
+    // press resolves — Neil expects the other pads to visibly let go the
+    // instant he presses a new one (if Ctrl isn't held), same instant a
+    // real explorer click narrows the selection. Independent of whatever
+    // *this* pad's own press turns into (decided later, at mouseup below).
     void onDragStart(const widget::Widget::DragStartEvent& e) override {
-        if (e.button == GLFW_MOUSE_BUTTON_LEFT && !ctrlHeld && onPlainClick) {
-            onPlainClick(this);
-        }
-        if (e.button == GLFW_MOUSE_BUTTON_LEFT && ctrlHeld && momentary) {
-            // Currently momentary (global latch mode is off): handle this
-            // click as a one-shot toggle instead of Switch's usual "press to
-            // max, spring back to min on release" — same effect as flipping
-            // this pad's own latch on, without touching the other pads or
-            // the persisted menu setting.
-            momentary = false;
-            individualLatch = true;
+        if (e.button == GLFW_MOUSE_BUTTON_LEFT && onPlainClick) {
+            bool ctrlHeld = (APP->window->getMods() & RACK_MOD_MASK) == RACK_MOD_CTRL;
+            if (!ctrlHeld) {
+                onPlainClick(this);
+            }
         }
         SvgSwitch::onDragStart(e);
+    }
+
+    // Whether *this* pad itself turns into a Ctrl-held sticky pad is decided
+    // here, at mouseup, rather than at mousedown — queried live via
+    // getMods() instead of a press-time snapshot, so you can start a plain
+    // press and still turn it into a hold by pressing Ctrl before releasing
+    // (not just before clicking). onDragStart above always runs the base
+    // class's normal momentary press unconditionally, so the pad visually
+    // presses the same way either way while held; only what happens at
+    // release differs.
+    void onDragEnd(const widget::Widget::DragEndEvent& e) override {
+        if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
+            bool ctrlHeld = (APP->window->getMods() & RACK_MOD_MASK) == RACK_MOD_CTRL;
+            if (ctrlHeld && momentary) {
+                // Currently momentary (global latch mode is off): handle this
+                // release as a one-shot toggle-on instead of Switch's usual
+                // "spring back to min" — same effect as flipping this pad's
+                // own latch on, without touching the other pads or the
+                // persisted menu setting. Flipping momentary off BEFORE
+                // calling the base class below means Switch::onDragEnd (via
+                // SvgSwitch::onDragEnd) sees momentary == false and never
+                // arms its own auto-release-to-min for this press.
+                momentary = false;
+                individualLatch = true;
+            }
+        }
+        SvgSwitch::onDragEnd(e);
         if (individualLatch) {
             engine::ParamQuantity* pq = getParamQuantity();
             if (pq && pq->isMin()) {
                 // Toggled back off (by a plain click or another Ctrl+click,
-                // both take the toggle branch once momentary is false) —
-                // drop the override; LunarPadsWidget::step() puts momentary
-                // back to the global setting on its next pass.
+                // both take the toggle branch in onDragStart once momentary
+                // is false) — drop the override; LunarPadsWidget::step()
+                // puts momentary back to the global setting on its next pass.
                 individualLatch = false;
             }
         }
