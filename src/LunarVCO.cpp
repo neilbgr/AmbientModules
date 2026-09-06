@@ -33,6 +33,7 @@ struct LunarVCO : Module {
     enum OutputIds {
         VCO_OUTPUT,           // enveloped (VCA'd) main output
         ENV_OUTPUT,
+        OSC_OUTPUT,           // raw oscillator phase, unenveloped -- for hard-syncing another LunarVCO's Sync input
         NUM_OUTPUTS
     };
     enum LightIds {
@@ -57,29 +58,30 @@ struct LunarVCO : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
         configSwitch(WAVEFORM_PARAM, 0.f, 5.f, 0.f, "Waveform",
-            {"Sine", "Triangle", "Inverted saw", "Square", "Saw to inv. saw (shape = blend)", "Sine to saw (shape = blend)"});
+            {"Sine", "Triangle", "Inverted saw", "Square (shape = pulse width)", "Saw to inv. saw (shape = blend)", "Sine to saw (shape = blend)"});
         configParam(TUNE_PARAM, -0.5f, 0.5f, 0.f, "Tune (1 octave range)");
         configSwitch(OCTAVE_PARAM, 0.f, 1.f, 0.f, "Octave", {"Low", "+3"});
-        configSwitch(SUB_PARAM, 0.f, 1.f, 0.f, "Sub oscillator", {"Off", "On (-1 octave)"});
+        configSwitch(SUB_PARAM, 0.f, 1.f, 0.f, "Add sub oscillator", {"Off", "On"});
         configSwitch(LINEXP_PARAM, 0.f, 1.f, 0.f, "FM mode", {"Linear", "Exponential"});
         configParam(SHAPE_PARAM, 0.f, 1.f, 0.5f, "Shape (pulse width / morph blend)");
         configParam(SHAPE_CV_ATTEN_PARAM, -1.f, 1.f, 0.f, "Shape CV amount", "%", 0.f, 100.f);
         configParam(FM_CV_ATTEN_PARAM, -1.f, 1.f, 0.f, "FM amount", "%", 0.f, 100.f);
-        configInput(VOCT_INPUT, "V/oct");
-        configInput(FM_INPUT, "FM");
-        configInput(SHAPE_CV_INPUT, "Shape CV");
-        configInput(SYNC_INPUT, "Sync");
-        configOutput(VCO_OUTPUT, "Audio Out");
+        configInput(VOCT_INPUT, "1V/octave pitch");
+        configInput(FM_INPUT, "FM CV (linear or exponential, depending on FM mode)");
+        configInput(SHAPE_CV_INPUT, "Shape CV (pulse width / morph blend)");
+        configInput(SYNC_INPUT, "Hard sync (resets phase to 0)");
+        configOutput(VCO_OUTPUT, "Audio");
+        configOutput(OSC_OUTPUT, "Phase (-5V to +5V)");
 
         configParam(ATTACK_PARAM, 0.f, 1.f, 0.4f, "Attack", " ms", ADSREnvelope::MAX_TIME / ADSREnvelope::MIN_TIME, ADSREnvelope::MIN_TIME * 1000.f);
         configParam(DECAY_PARAM, 0.f, 1.f, 0.2f, "Decay", " ms", ADSREnvelope::MAX_TIME / ADSREnvelope::MIN_TIME, ADSREnvelope::MIN_TIME * 1000.f);
         configParam(SUSTAIN_PARAM, 0.f, 1.f, 0.7f, "Sustain", "%", 0.f, 100.f);
         configParam(RELEASE_PARAM, 0.f, 1.f, 0.6f, "Release", " ms", ADSREnvelope::MAX_TIME / ADSREnvelope::MIN_TIME, ADSREnvelope::MIN_TIME * 1000.f);
         configSwitch(HOLD_PARAM, 0.f, 1.f, 0.f, "Hold", {"Off", "On"});
-        configSwitch(SELFGEN_PARAM, 0.f, 1.f, 0.f, "Self-generation", {"Off", "On"});
+        configSwitch(SELFGEN_PARAM, 0.f, 1.f, 0.f, "Self-generation (free-running LFO using ASR)", {"Off", "On (needs Gate/Hold to start)"});
         configInput(GATE_INPUT, "Gate");
-        configOutput(ENV_OUTPUT, "Envelope Out");
-        configInput(ENV_INPUT, "Envelope In (overrides internal envelope, gate and hold when connected)");
+        configOutput(ENV_OUTPUT, "Envelope");
+        configInput(ENV_INPUT, "Envelope (overrides internal envelope, gate and hold when connected)");
     }
 
     void process(const ProcessArgs& args) override {
@@ -124,6 +126,7 @@ struct LunarVCO : Module {
         bool envInputConnected = inputs[ENV_INPUT].isConnected();
         bool gateInputConnected = inputs[GATE_INPUT].isConnected();
         bool vcoOutputConnected = outputs[VCO_OUTPUT].isConnected();
+        bool oscOutputConnected = outputs[OSC_OUTPUT].isConnected();
 
         // Pass 1: envelopes are cheap scalar per-channel state (ADSREnvelope
         // isn't vectorized — its stages can diverge per channel on
@@ -159,7 +162,11 @@ struct LunarVCO : Module {
             // group of 4 (same idea as the old per-channel skip, just at
             // group granularity — see plan notes on this tradeoff).
             simd::float_4 dry4 = simd::float_4::zero();
-            if (vcoOutputConnected && simd::movemask(envValue4 > 0.f) != 0) {
+            // OSC_OUTPUT taps the oscillator core's raw phase directly (see
+            // below) and must keep running even while the amp envelope is at
+            // 0 -- unlike VCO_OUTPUT, it isn't shaped by the VCA/envelope at
+            // all on the real hardware, so it can't share that silence-skip.
+            if (oscOutputConnected || (vcoOutputConnected && simd::movemask(envValue4 > 0.f) != 0)) {
                 simd::float_4 pitch4 = tune + inputs[VOCT_INPUT].getPolyVoltageSimd<simd::float_4>(base);
                 simd::float_4 fmCv4 = inputs[FM_INPUT].getPolyVoltageSimd<simd::float_4>(base) * fmCvAtten;
                 simd::float_4 expFm4 = expMode ? fmCv4 : simd::float_4::zero();
@@ -174,9 +181,18 @@ struct LunarVCO : Module {
 
             outputs[VCO_OUTPUT].setVoltageSimd(dry4 * 5.f * envValue4, base);
             outputs[ENV_OUTPUT].setVoltageSimd(envValue4 * 10.f, base);
+
+            // Raw phase (already advanced/wrapped by vco[].process() above,
+            // in [0,1)) as a bipolar +-5V ramp -- equivalent to saw*5.f
+            // (saw = 2*phase-1 is the same shape LunarVCOCore already uses
+            // internally for the "Inverted saw" waveform), i.e. an
+            // un-band-limited raw phase ramp, not a shaped audio waveform.
+            simd::float_4 oscOut4 = vco[base / 4].phase * 10.f - 5.f;
+            outputs[OSC_OUTPUT].setVoltageSimd(oscOut4, base);
         }
         outputs[VCO_OUTPUT].setChannels(channels);
         outputs[ENV_OUTPUT].setChannels(channels);
+        outputs[OSC_OUTPUT].setChannels(channels);
 
         lights[OCTAVE_LIGHT].setBrightness(octaveOn ? 1.f : 0.f);
         lights[SUB_LIGHT].setBrightness(subOscOn ? 1.f : 0.f);
@@ -198,58 +214,55 @@ struct LunarVCOWidget : ModuleWidget {
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
         addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+
+        const float x1div7 =  8.485f;
+        const float x2div7 = 14.97f;
+        const float x3div7 = 21.455f;
+        //const float x4div7 = 27.94f;
+        const float x5div7 = 34.425f;
+        const float x6div7 = 40.91f;
+        const float x7div7 = 47.395f;
+
+        const float pnl1_y1 = 26.34352f;
+        const float pnl1_y2 = 40.f;
+
+        const float pnl2_y1 = 58.87806f;
+        const float pnl2_y2 = 69.80754f;
+
+        const float pnl3_y1 = 85.52656f;
+        const float pnl3_y2 = 99.10812f;
+        const float pnl3_y3 = 112.88505f;
+
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div7, pnl1_y2)), module, LunarVCO::SYNC_INPUT));
+        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(x2div7, pnl1_y1)), module, LunarVCO::WAVEFORM_PARAM));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x3div7, pnl1_y2)), module, LunarVCO::SUB_PARAM, LunarVCO::SUB_LIGHT));
+
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x5div7, pnl1_y2)), module, LunarVCO::SHAPE_CV_INPUT));
+        addParam(createParamCentered<Rogan1PGreen>(mm2px(Vec(x6div7, pnl1_y1)), module, LunarVCO::SHAPE_PARAM));
+        addParam(createParamCentered<Trimpot>(mm2px(Vec(x7div7, pnl1_y2)), module, LunarVCO::SHAPE_CV_ATTEN_PARAM));
+
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div7, pnl2_y2)), module, LunarVCO::VOCT_INPUT));  
+        addParam(createParamCentered<Rogan1PGreen>(mm2px(Vec(x2div7, pnl2_y1)), module, LunarVCO::TUNE_PARAM));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x3div7, pnl2_y2)), module, LunarVCO::OCTAVE_PARAM, LunarVCO::OCTAVE_LIGHT));
         
-        const float x1div3 = 11.37f;
-        const float x2div3 = 22.84f;
-        const float x3div3 = 34.39f;
-
-        const float x1div4 = 7.3f;
-        const float x2div4 = 17.57f;
-        const float x3div4 = 28.f;
-        const float x4div4 = 38.29f;
-
-        const float pnl1_y1 = 24.f;
-        const float pnl1_y2 = 34.5f;
-        const float pnl1_y3 = 43.f;
-
-        const float pnl2_y1 = 62.f;
-        const float pnl2_y2 = 73.f;
-
-        const float pnl3_y1 = 90.f;
-        const float pnl3_y2 = 100.f;
-        const float pnl3_y3 = 113.f;
-
-        addParam(createParamCentered<Rogan2PSGreen>(mm2px(Vec(14.5f, 27.5f)), module, LunarVCO::WAVEFORM_PARAM));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x5div7, pnl2_y2)), module, LunarVCO::FM_INPUT));
+        addParam(createParamCentered<Rogan1PGreen>(mm2px(Vec(x6div7, pnl2_y1)), module, LunarVCO::FM_CV_ATTEN_PARAM));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x7div7, pnl2_y2)), module, LunarVCO::LINEXP_PARAM, LunarVCO::LINEXP_LIGHT));
         
-        addParam(createParamCentered<Rogan1PGreen>(mm2px(Vec(x3div3, pnl1_y1)), module, LunarVCO::SHAPE_PARAM));
-        addParam(createParamCentered<Trimpot>(mm2px(Vec(x3div3, pnl1_y2)), module, LunarVCO::SHAPE_CV_ATTEN_PARAM));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x3div3, pnl1_y3)), module, LunarVCO::SHAPE_CV_INPUT));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x1div7, pnl3_y1)), module, LunarVCO::ATTACK_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x3div7, pnl3_y1)), module, LunarVCO::DECAY_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x5div7, pnl3_y1)), module, LunarVCO::SUSTAIN_PARAM));
+        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x7div7, pnl3_y1)), module, LunarVCO::RELEASE_PARAM));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div3, pnl1_y3)), module, LunarVCO::SYNC_INPUT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2div3, pnl1_y3)), module, LunarVCO::SUB_PARAM, LunarVCO::SUB_LIGHT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div7, pnl3_y2)), module, LunarVCO::ENV_INPUT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x3div7, pnl3_y2)), module, LunarVCO::SELFGEN_PARAM, LunarVCO::SELFGEN_LIGHT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x5div7, pnl3_y2)), module, LunarVCO::ENV_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x7div7, pnl3_y2)), module, LunarVCO::OSC_OUTPUT));
 
-        addParam(createParamCentered<Rogan1PGreen>(mm2px(Vec(x1div3, pnl2_y1)), module, LunarVCO::TUNE_PARAM));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div3, pnl2_y2)), module, LunarVCO::VOCT_INPUT));  
-
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2div3, pnl2_y1)), module, LunarVCO::OCTAVE_PARAM, LunarVCO::OCTAVE_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2div3, pnl2_y2)), module, LunarVCO::LINEXP_PARAM, LunarVCO::LINEXP_LIGHT));
-
-        addParam(createParamCentered<Rogan1PGreen>(mm2px(Vec(x3div3, pnl2_y1)), module, LunarVCO::FM_CV_ATTEN_PARAM));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x3div3, pnl2_y2)), module, LunarVCO::FM_INPUT));
-        
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x1div4, pnl3_y1)), module, LunarVCO::ATTACK_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x2div4, pnl3_y1)), module, LunarVCO::DECAY_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x3div4, pnl3_y1)), module, LunarVCO::SUSTAIN_PARAM));
-        addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(x4div4, pnl3_y1)), module, LunarVCO::RELEASE_PARAM));
-
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div3, pnl3_y2)), module, LunarVCO::ENV_INPUT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2div3, pnl3_y2)), module, LunarVCO::SELFGEN_PARAM, LunarVCO::SELFGEN_LIGHT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x3div3, pnl3_y2)), module, LunarVCO::ENV_OUTPUT));
-
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div3, pnl3_y3)), module, LunarVCO::GATE_INPUT));
-        addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(x2div3 - 5.5f, pnl3_y3 - 2.f)), module, LunarVCO::ENV_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x2div3, pnl3_y3)), module, LunarVCO::HOLD_PARAM, LunarVCO::HOLD_LIGHT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x3div3, pnl3_y3)), module, LunarVCO::VCO_OUTPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x1div7, pnl3_y3)), module, LunarVCO::GATE_INPUT));
+        addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(x2div7, pnl3_y3 - 2.f)), module, LunarVCO::ENV_LIGHT));
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(mm2px(Vec(x3div7, pnl3_y3)), module, LunarVCO::HOLD_PARAM, LunarVCO::HOLD_LIGHT));        
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x7div7, pnl3_y3)), module, LunarVCO::VCO_OUTPUT));
     }
 
     void step() override {

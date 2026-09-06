@@ -138,7 +138,7 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 - **FM amount** — attenuverter for the FM input.
 - **Attack / Decay / Sustain / Release** — the built-in ADSR envelope.
 - **Hold** (lit button) — see [Shared conventions](#shared-conventions).
-- **Self-generation** (lit button) — turns the envelope generator into a free-running LFO instead of a one-shot envelope; Attack and Release should be turned low (towards 9 o'clock) for this to cycle usefully, and Sustain sets its peak depth. Still needs Gate to have gone high at least once (or Hold engaged) to start — it doesn't cycle on its own from silence.
+- **Self-generation** (lit button) — turns the envelope generator into a free-running LFO instead of a one-shot envelope, cycling Attack/Release only (Decay is skipped); Attack and Release should be turned low (towards 9 o'clock) for this to cycle usefully, and Sustain sets its peak depth. Still needs Gate to have gone high at least once (or Hold engaged) to start — it doesn't cycle on its own from silence.
 
 **Inputs**
 - **V/oct** — pitch, standard 1V/octave.
@@ -151,6 +151,7 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 **Outputs**
 - **Audio Out** — the enveloped (VCA'd) oscillator signal.
 - **Envelope Out** — 0–10V copy of the ADSR currently shaping Audio Out.
+- **OSC Out** — raw, unenveloped oscillator phase (±5V ramp); mirrors the hardware's VCO B "OSC" output. Patch it into another LunarVCO's Sync input to hard-sync that oscillator to this one.
 
 **LEDs**
 - **Envelope** (yellow, standalone) — brightness follows the ADSR's current level, glowing brighter through Attack/Sustain and dimming through Decay/Release.
@@ -158,6 +159,7 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 **Patch ideas**
 - Drive V/oct from [LunarSequencer](#lunarsequencer)'s Step CV output for melodic drone runs.
 - Enable Self-generation with a slow Attack/Release and Hold engaged to use the envelope itself as a free amplitude LFO with nothing patched into Gate.
+- Two LunarVCOs, A and B: patch B's OSC Out into A's Sync input for a classic hard-sync timbre — detune A against B and sweep A's Tune/FM for the sync "sweep" sound.
 
 ## LunarLFO
 
