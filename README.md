@@ -12,9 +12,9 @@
 | [LunarPapaSrapa](#lunarpapasrapa) | FM/AM cross-modulated noise/drone voice            | Drone voices 3, 6 "Papa Srapa"             |
 | [LunarLFO](#lunarlfo)             | Dual unipolar triangle/square LFO                  | LFOs                                       |
 | [LunarSequencer](#lunarsequencer) | 3-to-5-stage Buchla-inspired CV/gate sequencer     | Sequencer                                  |
-| [LunarPads](#lunarpads)           | 6-pad momentary/latching gate source for the drone voices | "DRONE KEYS" pushbutton grid        |
 | [LunarMixer](#lunarmixer)         | 9-channel panoramic mixer with master level        | Mixer page                                 |
 | [LunarJoystick](#lunarjoystick)   | Draggable XY pad / CV position source, per-axis range + offset | Joystick block                  |
+| [LunarPads](#lunarpads)           | 6-pad momentary/latching gate source for the drone voices | "DRONE KEYS" pushbutton grid        |
 
 ## Table of Contents
 
@@ -23,15 +23,15 @@
 - [Panel themes](#panel-themes)
 - [Right-click menu](#right-click-menu)
 - [Shared conventions](#shared-conventions)
+- [Blank](#blank)
 - [Lunar50Drone](#lunar50drone)
 - [LunarVCO](#lunarvco)
-- [LunarLFO](#lunarlfo)
 - [LunarPapaSrapa](#lunarpapasrapa)
+- [LunarLFO](#lunarlfo)
 - [LunarSequencer](#lunarsequencer)
-- [LunarPads](#lunarpads)
 - [LunarMixer](#lunarmixer)
 - [LunarJoystick](#lunarjoystick)
-- [Blank](#blank)
+- [LunarPads](#lunarpads)
 
 ## Videos
 
@@ -89,6 +89,11 @@ A few behaviors repeat across several modules and are only explained here:
 - **Envelope CV override.** Lunar50Drone, LunarVCO, and LunarPapaSrapa each have an **Envelope CV** input. When it's patched, it completely replaces that module's internal envelope, its Gate input, and its Hold switch — handy for driving several of these modules from one shared envelope so their amplitudes stay locked together.
 - **Hold.** Also shared by those same three modules: a **Hold** switch that, when engaged, forces the envelope open permanently (an "always on" drone) — same effect as holding the Gate input high, and the same switch is overridden the moment the Envelope CV input is patched.
 
+## Blank
+
+![Blank panel](docs/images/Blank.png)
+
+An empty panel with no parameters, inputs, or outputs — a spacer/template module, not a functional sound source.
 ## Lunar50Drone
 
 ![Lunar50Drone panel](docs/images/Lunar50Drone.png)
@@ -168,31 +173,6 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 - Enable Self-generation with a slow Attack/Release and Hold engaged to use the envelope itself as a free amplitude LFO with nothing patched into Gate.
 - Two LunarVCOs, A and B: patch B's OSC Out into A's Sync input for a classic hard-sync timbre — detune A against B and sweep A's Tune/FM for the sync "sweep" sound.
 
-## LunarLFO
-
-![LunarLFO panel](docs/images/LunarLFO.png)
-
-Two independent, unipolar (by default) LFOs — LFO A and LFO B — each blending continuously between a triangle and a square wave.
-
-**Knobs**
-- **LFO A / B rate** — octave-spaced rate knobs, one per LFO.
-- **LFO A / B wave** — morphs that LFO's shape between triangle and square.
-
-**Inputs:** none.
-
-**Outputs**
-- **LFO A** / **LFO B** — each only runs while its output is patched (idle and reset to phase 0 otherwise); voltage range set by CV Range below.
-
-<a id="lunarlfo-context-menu"></a>
-**Context menu**
-- **CV Range** — sets the output range shared by both LFO A and B: *0V to +5V* (default, matches the SOLAR 42F hardware), *0V to +10V*, *-5V to +5V*, or *-10V to +10V*.
-
-![LunarLFO CV Range submenu](docs/images/LunarLFO_Menu_CvRanges.png)
-
-**Patch ideas**
-- Patch LFO A into [Lunar50Drone](#lunar50drone)'s Frequency CV, or into [LunarVCO](#lunarvco)'s Shape CV, for slow evolving drone movement.
-- Set CV Range to a bipolar range and use LFO B to pan or crossfade elsewhere in the patch.
-
 ## LunarPapaSrapa
 
 ![LunarPapaSrapa panel](docs/images/LunarPapaSrapa.png)
@@ -233,6 +213,31 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 - Turn on both FM and AM with a fast Rate and high Modulation depth for the "sirens and space monsters" sounds the original Papa Srapa circuit is known for.
 - Patch [LunarSequencer](#lunarsequencer)'s Clock Out into Sample & hold clock to resample the internal noise once per step, for a random stepped CV source.
 
+## LunarLFO
+
+![LunarLFO panel](docs/images/LunarLFO.png)
+
+Two independent, unipolar (by default) LFOs — LFO A and LFO B — each blending continuously between a triangle and a square wave.
+
+**Knobs**
+- **LFO A / B rate** — octave-spaced rate knobs, one per LFO.
+- **LFO A / B wave** — morphs that LFO's shape between triangle and square.
+
+**Inputs:** none.
+
+**Outputs**
+- **LFO A** / **LFO B** — each only runs while its output is patched (idle and reset to phase 0 otherwise); voltage range set by CV Range below.
+
+<a id="lunarlfo-context-menu"></a>
+**Context menu**
+- **CV Range** — sets the output range shared by both LFO A and B: *0V to +5V* (default, matches the SOLAR 42F hardware), *0V to +10V*, *-5V to +5V*, or *-10V to +10V*.
+
+![LunarLFO CV Range submenu](docs/images/LunarLFO_Menu_CvRanges.png)
+
+**Patch ideas**
+- Patch LFO A into [Lunar50Drone](#lunar50drone)'s Frequency CV, or into [LunarVCO](#lunarvco)'s Shape CV, for slow evolving drone movement.
+- Set CV Range to a bipolar range and use LFO B to pan or crossfade elsewhere in the patch.
+
 ## LunarSequencer
 
 ![LunarSequencer panel](docs/images/LunarSequencer.png)
@@ -266,32 +271,6 @@ A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step sto
 **Patch ideas**
 - Feed Step CV into [LunarVCO](#lunarvco) or [Lunar50Drone](#lunar50drone)'s pitch/frequency input, and Step gate into their Gate input, for a self-contained melodic sequence.
 - Chain two LunarSequencers by patching one's Clock Out into the other's Clock In to build longer combined patterns.
-
-## LunarPads
-
-![LunarPads panel](docs/images/LunarPads.png)
-
-The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 drone voices (Drone 1/2/4/5 = [Lunar50Drone](#lunar50drone) "Classic Solar 50", Drone 3/6 = [LunarPapaSrapa](#lunarpapasrapa)). VCO A/B aren't covered here — they already have their own gate/envelope, driven by the touch keyboard on the real hardware.
-
-**Pads**
-- **Drone 1–6** (square pad + LED) — triggers that drone voice's gate: momentary by default (gate high only while held, matching the hardware's pushbutton keyboard) or latching (a click toggles it on/off, like a mute button) depending on the Latch mode menu setting below.
-- **Ctrl+click** holds one pad down like a second finger, independently of the Latch mode setting — even with Latch mode off (so every other pad still springs back on release), Ctrl-clicking a pad keeps that one held until it's clicked again (with or without Ctrl). A plain click on any pad releases every *other* pad currently held this way, file-explorer-selection style, so you can sustain one or two voices by hand while triggering the rest normally.
-
-**Inputs**
-- **Drone 1–6 external gate** — ORs into that pad's own gate (e.g. from MIDI), regardless of Latch mode, so an external source can trigger it alongside the mouse.
-
-**Outputs**
-- **Drone 1–6 gate** — 0/10V logic level, high whenever that pad or its external gate input is active.
-
-<a id="lunarpads-context-menu"></a>
-**Context menu**
-- **Latch mode** — unchecked (default): pads are momentary. Checked: clicking a pad toggles it on/off instead of requiring it to be held.
-
-![LunarPads Latch mode menu](docs/images/LunarPads_Menu.png)
-
-**Patch ideas**
-- Patch the gate outputs here into [Lunar50Drone](#lunar50drone)/[LunarPapaSrapa](#lunarpapasrapa)'s Gate input to trigger those drones from this shared pad grid instead of each module's own Gate jack.
-- Turn on Latch mode and Ctrl+click a couple of pads to build a sustained drone, then trigger the rest momentarily on top for accents.
 
 ## LunarMixer
 
@@ -338,8 +317,29 @@ Electrical equivalent of the SOLAR 42F Joystick block, without the physical stic
 - Patch X and Y into two parameters you want to move together by hand (e.g. [Lunar50Drone](#lunar50drone)'s Volt and [LunarVCO](#lunarvco)'s Shape) for a single 2D "macro" control.
 - Feed a slow [LunarLFO](#lunarlfo) into X or Y In (Range set to match the LFO's own output range) for a hands-off wandering position you can still grab and override by hand at any time.
 
-## Blank
+## LunarPads
 
-![Blank panel](docs/images/Blank.png)
+![LunarPads panel](docs/images/LunarPads.png)
 
-An empty panel with no parameters, inputs, or outputs — a spacer/template module, not a functional sound source.
+The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 drone voices (Drone 1/2/4/5 = [Lunar50Drone](#lunar50drone) "Classic Solar 50", Drone 3/6 = [LunarPapaSrapa](#lunarpapasrapa)). VCO A/B aren't covered here — they already have their own gate/envelope, driven by the touch keyboard on the real hardware.
+
+**Pads**
+- **Drone 1–6** (square pad + LED) — triggers that drone voice's gate: momentary by default (gate high only while held, matching the hardware's pushbutton keyboard) or latching (a click toggles it on/off, like a mute button) depending on the Latch mode menu setting below.
+- **Ctrl+click** holds one pad down like a second finger, independently of the Latch mode setting — even with Latch mode off (so every other pad still springs back on release), Ctrl-clicking a pad keeps that one held until it's clicked again (with or without Ctrl). A plain click on any pad releases every *other* pad currently held this way, file-explorer-selection style, so you can sustain one or two voices by hand while triggering the rest normally.
+
+**Inputs**
+- **Drone 1–6 external gate** — ORs into that pad's own gate (e.g. from MIDI), regardless of Latch mode, so an external source can trigger it alongside the mouse.
+
+**Outputs**
+- **Drone 1–6 gate** — 0/10V logic level, high whenever that pad or its external gate input is active.
+
+<a id="lunarpads-context-menu"></a>
+**Context menu**
+- **Latch mode** — unchecked (default): pads are momentary. Checked: clicking a pad toggles it on/off instead of requiring it to be held.
+
+![LunarPads Latch mode menu](docs/images/LunarPads_Menu.png)
+
+**Patch ideas**
+- Patch the gate outputs here into [Lunar50Drone](#lunar50drone)/[LunarPapaSrapa](#lunarpapasrapa)'s Gate input to trigger those drones from this shared pad grid instead of each module's own Gate jack.
+- Turn on Latch mode and Ctrl+click a couple of pads to build a sustained drone, then trigger the rest momentarily on top for accents.
+
