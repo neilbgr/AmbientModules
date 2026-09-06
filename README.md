@@ -19,6 +19,7 @@
 ## Table of Contents
 
 - [Videos](#videos)
+- [Solar 42f patch](#solar-42f-patch)
 - [Panel themes](#panel-themes)
 - [Right-click menu](#right-click-menu)
 - [Shared conventions](#shared-conventions)
@@ -36,6 +37,12 @@
 
 - [Lunar 42 VCV Rack modules - Cinematic performance](https://youtu.be/Ja0lZwwcWLM) — a live patch using Lunar50Drone, LunarVCO, and LunarLFO; inspired by [JayHosking's original "Solar 42F synth - Cinematic performance"](https://www.youtube.com/watch?v=wQyHPJ56aNg).
 - [Lunar 42 VCV Rack modules - Cinematic Ambient](https://youtu.be/l4NEwDLc4YI) — a live patch using Lunar50Drone, LunarVCO, LunarLFO, and LunarSequencer; inspired by [JayHosking's original "Cinematic Ambient (part 1)"](https://www.youtube.com/watch?v=45tY-e7fdm4).
+
+## Solar 42f patch
+
+![Solar42-patch.vcv](docs/images/Solar42-Patch.png)
+
+[**Solar42-patch.vcv**](patches/Solar42-patch.vcv) — a full-rack patch reassembling the SOLAR 42F's own architecture out of these modules: 4× Lunar50Drone (Drone 1/2/4/5, Oscillator mix set to *Fixed sum / 5 (legacy)* to match the real hardware's mixing) and 2× LunarPapaSrapa (Drone 3/6) gated from LunarPads, 2× LunarVCO (VCO A/B, cross-modulating each other's FM and both driven from the same MIDI keyboard), all summed through LunarMixer, plus LunarSequencer/LunarLFO/LunarJoystick for modulation. Uses Cardinal's HostMIDI/HostAudio2 for keyboard input and audio output, so it's meant to be opened in Cardinal rather than standalone VCV Rack (drag the file onto the Cardinal window, or File → Open).
 
 ## Panel themes
 
@@ -279,6 +286,8 @@ The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 dro
 <a id="lunarpads-context-menu"></a>
 **Context menu**
 - **Latch mode** — unchecked (default): pads are momentary. Checked: clicking a pad toggles it on/off instead of requiring it to be held.
+
+![LunarPads Latch mode menu](docs/images/LunarPads_Menu.png)
 
 **Patch ideas**
 - Patch the gate outputs here into [Lunar50Drone](#lunar50drone)/[LunarPapaSrapa](#lunarpapasrapa)'s Gate input to trigger those drones from this shared pad grid instead of each module's own Gate jack.
