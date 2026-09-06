@@ -323,7 +323,7 @@ Electrical equivalent of the SOLAR 42F Joystick block, without the physical stic
 - **X / Y** — CV overriding the pad's manual position on that axis when patched (see above).
 
 **Outputs**
-- **X / Y** — the resulting position (manual or CV, rescaled by Range X/Y) plus that axis's offset knob.
+- **X / Y** — the resulting position (manual or CV, rescaled by Range X/Y) plus that axis's offset knob. Lightly smoothed (5ms one-pole lowpass) to remove hard steps from a stepped CV source or a jerky mouse drag — deliberately short enough to be imperceptible by hand, not a real slew/portamento effect; the displayed crosshair itself isn't smoothed, only this output.
 
 **Patch ideas**
 - Patch X and Y into two parameters you want to move together by hand (e.g. [Lunar50Drone](#lunar50drone)'s Volt and [LunarVCO](#lunarvco)'s Shape) for a single 2D "macro" control.

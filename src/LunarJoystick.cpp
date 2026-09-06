@@ -22,6 +22,29 @@ struct LunarJoystick : Module {
     // gesture — see axisPosition() below.
     bool xyPadDragging = false;
 
+    // One-pole lowpass on the final output only (not the displayed pad
+    // position, which stays instant) -- just enough to kill hard steps from
+    // a stepped CV source or a jerky mouse drag, same smoothing formula as
+    // PapaSrapaCore's SMOOTH_TAU. 5ms is deliberately short: barely
+    // perceptible by hand, not a real slew/portamento effect.
+    float xSmooth = 0.f;
+    float ySmooth = 0.f;
+    static constexpr float SMOOTH_TAU = 0.005f;
+    // smoothCoef only depends on sampleTime (fixed TAU above), so it's cached
+    // here and recomputed solely in onSampleRateChange() -- not every sample
+    // like ADSREnvelope's per-knob lambdas, which genuinely vary every call.
+    float smoothCoef = 0.f;
+
+    void onSampleRateChange(const SampleRateChangeEvent& e) override {
+        // exp2_taylor5 (already used by ADSREnvelope::lambdaFromKnob) instead
+        // of std::exp: base-2 Taylor/Horner approximation (<=6e-6 relative
+        // error) instead of libm's exp(), which spends cycles on range
+        // reduction/edge cases this bounded, always-negative argument never
+        // hits. exp(z) == 2^(z * log2(e)).
+        constexpr float LOG2E = 1.4426950408889634f;
+        smoothCoef = 1.f - dsp::exp2_taylor5(-e.sampleTime / SMOOTH_TAU * LOG2E);
+    }
+
     enum ParamIds {
         X_PARAM,
         Y_PARAM,
@@ -96,8 +119,12 @@ struct LunarJoystick : Module {
     void process(const ProcessArgs& args) override {
         float x = axisPosition(inputs[X_INPUT], params[X_PARAM], rangeIndex(params[RANGE_X_PARAM]), xyPadDragging) + params[X_OFFSET_PARAM].getValue();
         float y = axisPosition(inputs[Y_INPUT], params[Y_PARAM], rangeIndex(params[RANGE_Y_PARAM]), xyPadDragging) + params[Y_OFFSET_PARAM].getValue();
-        outputs[X_OUTPUT].setVoltage(x);
-        outputs[Y_OUTPUT].setVoltage(y);
+
+        xSmooth += (x - xSmooth) * smoothCoef;
+        ySmooth += (y - ySmooth) * smoothCoef;
+
+        outputs[X_OUTPUT].setVoltage(xSmooth);
+        outputs[Y_OUTPUT].setVoltage(ySmooth);
     }
 };
 
@@ -111,7 +138,9 @@ struct LunarJoystickWidget : ModuleWidget {
         syncPanelTheme(this, "LunarJoystick", appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
+        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // Placeholder layout: one shared XY pad for X_PARAM/Y_PARAM up top
         // (replaces the 2 separate knobs), then a row per axis below (In,
