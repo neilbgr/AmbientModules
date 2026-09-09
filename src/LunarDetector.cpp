@@ -77,32 +77,19 @@ struct LunarDetectorWidget : ModuleWidget {
         syncPanelTheme(this, "LunarDetector", appliedTheme);
 
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, 0)));
-        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild(createWidget<ThemedScrew>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-        addChild(createWidget<ThemedScrew>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         // Placeholder layout: single column, top to bottom: IN, GAIN,
         // ATTACK, RELEASE, ENV, GATE. Panel WIP in Inkscape.
-        const float centerX = 15.f;
-        const float topMargin = 15.f;
-        const float rowPitch = 17.f;
-
-        float y = topMargin;
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(centerX, y)), module, LunarDetector::IN_INPUT));
-        y += rowPitch;
-        // Same knob as LunarSequencer's Rate/Step CV knobs (Rogan1PRed,
-        // stock Rack SDK component, ~10.6mm), per Neil's ask to match it
-        // exactly in size and color rather than this pack's own custom
-        // Valley-derived RoganMedSmall family.
-        addParam(createParamCentered<Rogan1PRed>(mm2px(Vec(centerX, y)), module, LunarDetector::GAIN_PARAM));
-        y += rowPitch;
-        addParam(createParamCentered<Rogan1PRed>(mm2px(Vec(centerX, y)), module, LunarDetector::ATTACK_PARAM));
-        y += rowPitch;
-        addParam(createParamCentered<Rogan1PRed>(mm2px(Vec(centerX, y)), module, LunarDetector::RELEASE_PARAM));
-        y += rowPitch;
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(centerX, y)), module, LunarDetector::ENV_OUTPUT));
-        y += rowPitch;
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(centerX, y)), module, LunarDetector::GATE_OUTPUT));
+        // Same width (4HP, 20.32mm) and knob (Rogan1PSRed, stock Rack SDK,
+        // ~10.5mm) as LunarLFO, per Neil's ask to match it exactly.
+        const float centerX = 10.16f;
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(centerX, 22.42869f)), module, LunarDetector::IN_INPUT));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(centerX, 38.05638f)), module, LunarDetector::GAIN_PARAM));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(centerX, 62.10037f)), module, LunarDetector::ATTACK_PARAM));
+        addParam(createParamCentered<Rogan1PSRed>(mm2px(Vec(centerX, 81.20818f)), module, LunarDetector::RELEASE_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(centerX, 98.90391f)), module, LunarDetector::ENV_OUTPUT));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(centerX, 111.60391f)), module, LunarDetector::GATE_OUTPUT));
     }
 
     void step() override {
