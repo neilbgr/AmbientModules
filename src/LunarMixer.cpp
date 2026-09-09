@@ -120,17 +120,17 @@ struct LunarMixerWidget : ModuleWidget {
             addParam(createParamCentered<RoganMedSmallWhite>(mm2px(Vec(xPan, y)), module, LunarMixer::PAN_PARAM + i));
         }
 
-        // Output column: L / master volume / R stacked vertically, centered
-        // in the same 12mm/9mm usable band as the channel rows.
         float xOut = 47.28f;
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xOut, topMargin + rowPitch * (3 + 0.5f))), module, LunarMixer::OUTPUT_L));
-        addParam(createParamCentered<RoganMedSmallBlack>(mm2px(Vec(xOut, topMargin + rowPitch * (4 + 0.5f))), module, LunarMixer::MASTER_VOL_PARAM));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xOut, topMargin + rowPitch * (5 + 0.5f))), module, LunarMixer::OUTPUT_R));
+        addParam(createParamCentered<RoganMedSmallBlack>(mm2px(Vec(xOut, topMargin + rowPitch * (6 + 0.5f))), module, LunarMixer::MASTER_VOL_PARAM));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xOut, topMargin + rowPitch * (7 + 0.5f))), module, LunarMixer::OUTPUT_L));
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xOut, topMargin + rowPitch * (8 + 0.5f))), module, LunarMixer::OUTPUT_R));
 
-        // Panel width: xOut + edgeMargin = 55.4mm, rounded up to 11HP (55.88mm)
-        // — was 12HP (60.96mm) before this pass, 13HP (66.04mm) with the
-        // VCO A/B dry-thru column before that. Set directly in
-        // res/LunarMixer_*.svg (box.size.x is already in px).
+        /* VU/Peak meter
+        Top : 13.f 
+        Bottom : 80.f
+        Left : 42.28f
+        Right : 52.28f
+        */
     }
 
     void step() override {

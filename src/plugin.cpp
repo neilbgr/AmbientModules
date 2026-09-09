@@ -15,4 +15,6 @@ void init(Plugin *p) {
     p->addModel(modelLunarJoystick);
     p->addModel(modelLunarMixer);
     p->addModel(modelLunarPads);
+    p->addModel(modelLunarDetector);
+    p->addModel(modelLunarFilter);
 }

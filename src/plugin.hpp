@@ -14,3 +14,5 @@ extern Model *modelLunarSequencer;
 extern Model *modelLunarJoystick;
 extern Model *modelLunarMixer;
 extern Model *modelLunarPads;
+extern Model *modelLunarDetector;
+extern Model *modelLunarFilter;

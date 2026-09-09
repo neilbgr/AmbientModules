@@ -16,3 +16,7 @@ https://github.com/ValleyAudio/ValleyRackFree).
   copied unmodified from Valley's smaller "Small" size tier (~5.2mm vs the
   ~8.4mm "MedSmall" tier above) — the same knob Plateau uses for its
   "Predelay" control. Used by LunarJoystick's range-selector knob.
+- `Rogan1PSOrangeMedSmall-fg.svg`: derived from `Rogan1PSWhiteMedSmall-fg.svg`
+  the same way `Rogan1PSBlackMedSmall-fg.svg` was — recoloring only the face
+  disc (`#e3e3e3` -> `#eb8a41`), same shared gloss gradient/bezel/tab as the
+  White and Black variants. Used by LunarFilter's knobs.

@@ -15,6 +15,8 @@
 | [LunarMixer](#lunarmixer)         | 9-channel panoramic mixer with master level        | Mixer page                                 |
 | [LunarJoystick](#lunarjoystick)   | Draggable XY pad / CV position source, per-axis range + offset | Joystick block                  |
 | [LunarPads](#lunarpads)           | 6-pad momentary/latching gate source for the drone voices | "DRONE KEYS" pushbutton grid        |
+| [LunarDetector](#lunardetector)   | External-source preamp with envelope follower + gate detector | Contact mic + Envelope follower block |
+| [LunarFilter](#lunarfilter)       | Dual 12dB Polivoks-style multimode filter + distortion | Filter block                          |
 
 ## Table of Contents
 
@@ -32,6 +34,8 @@
 - [LunarMixer](#lunarmixer)
 - [LunarJoystick](#lunarjoystick)
 - [LunarPads](#lunarpads)
+- [LunarDetector](#lunardetector)
+- [LunarFilter](#lunarfilter)
 
 ## Videos
 
@@ -78,7 +82,7 @@ Right-click any AmbientModules module to open its context menu. One entry is ide
 
 ![Theme submenu](docs/images/Menu_Themes.png)
 
-Some modules add extra entries of their own — those are documented under the module in question ([Lunar50Drone](#lunar50drone-context-menu), [LunarLFO](#lunarlfo-context-menu), [LunarSequencer](#lunarsequencer-context-menu), [LunarPads](#lunarpads-context-menu)). LunarVCO, LunarPapaSrapa, LunarMixer, LunarJoystick, and Blank have no module-specific entries.
+Some modules add extra entries of their own — those are documented under the module in question ([Lunar50Drone](#lunar50drone-context-menu), [LunarLFO](#lunarlfo-context-menu), [LunarSequencer](#lunarsequencer-context-menu), [LunarPads](#lunarpads-context-menu)). LunarVCO, LunarPapaSrapa, LunarMixer, LunarJoystick, LunarDetector, LunarFilter, and Blank have no module-specific entries.
 
 ## Shared conventions
 
@@ -342,4 +346,48 @@ The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 dro
 **Patch ideas**
 - Patch the gate outputs here into [Lunar50Drone](#lunar50drone)/[LunarPapaSrapa](#lunarpapasrapa)'s Gate input to trigger those drones from this shared pad grid instead of each module's own Gate jack.
 - Turn on Latch mode and Ctrl+click a couple of pads to build a sustained drone, then trigger the rest momentarily on top for accents.
+
+## LunarDetector
+
+Reimplements the SOLAR 42F's "CONTACT MIC + ENVELOPE FOLLOWER" block: a preamp, an Attack/Release envelope follower, and a hysteresis gate detector. The real hardware normally reads its internal piezo contact mic unless an external source is patched into its EXT.SOURCE jack, which then takes over instead — there's no piezo to simulate in software, so this module only exposes that external-source path.
+
+**Knobs**
+- **Gain** — preamp gain, 0 to 40dB (matching the hardware's stated range, from line-level sources up to tiny contact-mic-level signals).
+- **Attack / Release** — envelope follower response time, same exponential taper (1ms to 15s) as every other envelope in this pack.
+
+**Inputs**
+- **In** — external audio source.
+
+**Outputs**
+- **Envelope** — the followed envelope level, 0 to +10V.
+- **Gate** — 0/+8V, opens once the envelope crosses above a small hysteresis threshold and closes once it drops back below it.
+
+**Patch ideas**
+- Feed a contact mic, guitar, or any line-level source into In, then use Gate to trigger [Lunar50Drone](#lunar50drone) or [LunarPapaSrapa](#lunarpapasrapa)'s Gate input and Envelope to modulate a filter or VCA elsewhere in the patch.
+
+## LunarFilter
+
+Reimplements the SOLAR 42F's "FILTER" block: two independent 12dB Polivoks-style multimode (Low-pass/Band-pass) filters, meant to follow [LunarMixer](#lunarmixer)'s stereo output, plus a shared distortion stage — same chain as the real hardware (Mixer → Dual filter → Distortion).
+
+Only Filter L's frequency can be modulated by CV; Link, when on, makes Filter R's effective frequency (knob + CV) follow Filter L's instead of using its own Frequency knob. Resonance and the Low-pass/Band-pass switch always stay independent per filter, whether Link is on or not — confirmed against Elta Music's own demo videos of the hardware.
+
+**Knobs**
+- **Frequency L/R** — filter cutoff, 20Hz to 20kHz. Filter R's Frequency knob is bypassed while Link is on.
+- **Resonance L/R** — always independent, even with Link on. High resonance can self-oscillate; the filter's feedback path is soft-clipped so it settles at a stable, bounded amplitude rather than blowing up.
+- **Type L/R** — Low-pass or Band-pass, always independent, even with Link on.
+- **CV amount** — depth of the CV input's effect on Filter L's frequency (and, if Link is on, Filter R's too).
+- **Distortion blend** — crossfades between the clean filtered signal and the distorted one.
+- **Distortion amount** — drive into the distortion stage's soft clipper.
+- **Link** — Filter R's effective frequency follows Filter L's (see above) instead of its own Frequency knob.
+
+**Inputs**
+- **In L/R** — stereo audio input.
+- **CV** — modulates Filter L's frequency only (see above).
+
+**Outputs**
+- **Out L/R** — stereo output, after both filters and the shared distortion stage.
+
+**Patch ideas**
+- Feed [LunarMixer](#lunarmixer)'s Left/Right outputs directly into In L/R for the hardware's full Mixer → Filter chain.
+- Turn Link on and patch a slow [LunarLFO](#lunarlfo) into CV for a filter sweep that moves both channels together.
 

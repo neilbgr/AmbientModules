@@ -27,6 +27,16 @@ struct RoganMedSmallBlack : Rogan {
     }
 };
 
+// Same knob family as White/Black above, recolored #eb8a41 — used for every
+// knob on LunarFilter's panel.
+struct RoganMedSmallOrange : Rogan {
+    RoganMedSmallOrange() {
+        setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSWhiteMedSmall.svg")));
+        bg->setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSMedSmall-bg.svg")));
+        fg->setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSOrangeMedSmall-fg.svg")));
+    }
+};
+
 // Same small-diameter red Rogan Valley/Plateau uses for its "Predelay" knob
 // (RoganSmallRed in plugins/ValleyAudio/src/gui/ValleyComponents.hpp:140-146)
 // — ~5.2mm, noticeably smaller than the stock Rogan1PSRed (~10.5mm) or even

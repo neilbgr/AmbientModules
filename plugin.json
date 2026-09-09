@@ -76,6 +76,20 @@
       "description": "6-pad gate source for the drone voices (4 Lunar50Drone, 2 LunarPapaSrapa), momentary or latching, each pad's external gate input lets an external MIDI gate source trigger it alongside the mouse",
       "manualUrl": "https://github.com/neilbgr/AmbientModules/blob/main/README.md#lunarpads",
       "tags": ["Utility", "Switch"]
+    },
+    {
+      "slug": "LunarDetector",
+      "name": "LunarDetector",
+      "description": "External-source preamp with an Attack/Release envelope follower and a hysteresis gate detector",
+      "manualUrl": "https://github.com/neilbgr/AmbientModules/blob/main/README.md#lunardetector",
+      "tags": ["Envelope follower", "Utility"]
+    },
+    {
+      "slug": "LunarFilter",
+      "name": "LunarFilter",
+      "description": "Dual 12dB Polivoks-style multimode (Low-pass/Band-pass) filter with a shared cutoff CV, Link, and a shared distortion stage",
+      "manualUrl": "https://github.com/neilbgr/AmbientModules/blob/main/README.md#lunarfilter",
+      "tags": ["Filter", "Distortion", "Dual"]
     }
   ]
 }
