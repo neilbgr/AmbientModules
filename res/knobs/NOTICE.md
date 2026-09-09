@@ -20,3 +20,7 @@ https://github.com/ValleyAudio/ValleyRackFree).
   the same way `Rogan1PSBlackMedSmall-fg.svg` was — recoloring only the face
   disc (`#e3e3e3` -> `#eb8a41`), same shared gloss gradient/bezel/tab as the
   White and Black variants. Used by LunarFilter's knobs.
+- `Rogan1PSOrangeMedSmall.svg`: derived from `Rogan1PSWhiteMedSmall.svg`,
+  unlike Black which reuses White's cap unmodified — recolors only the
+  position-indicator tab (`#e3e3e3` -> `#eb8a41`) so the tab matches the
+  orange face instead of staying white; the dark knurled rim is unchanged.

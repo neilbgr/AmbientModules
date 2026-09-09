@@ -31,7 +31,7 @@ struct RoganMedSmallBlack : Rogan {
 // knob on LunarFilter's panel.
 struct RoganMedSmallOrange : Rogan {
     RoganMedSmallOrange() {
-        setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSWhiteMedSmall.svg")));
+        setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSOrangeMedSmall.svg")));
         bg->setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSMedSmall-bg.svg")));
         fg->setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSOrangeMedSmall-fg.svg")));
     }
@@ -60,6 +60,17 @@ struct RoganRangeSelector : RoganSmallRed {
     RoganRangeSelector() {
         minAngle = -0.75f * (float)M_PI;
         maxAngle = -0.25f * (float)M_PI;
+    }
+};
+
+// Horizontal (left/right) variant of the stock Rack SDK CKSS toggle — see
+// res/switches/NOTICE.md for how the artwork was derived. Used by
+// LunarMixer's VU/Peak switch.
+struct CKSSHorizontal : app::SvgSwitch {
+    CKSSHorizontal() {
+        shadow->opacity = 0.f;
+        addFrame(Svg::load(asset::plugin(pluginInstance, "res/switches/CKSSHorizontal_0.svg")));
+        addFrame(Svg::load(asset::plugin(pluginInstance, "res/switches/CKSSHorizontal_1.svg")));
     }
 };
 

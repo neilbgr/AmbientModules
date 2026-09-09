@@ -26,13 +26,13 @@
      showgrid="true"
      inkscape:zoom="2"
      inkscape:cx="36"
-     inkscape:cy="288.75"
+     inkscape:cy="48.75"
      inkscape:window-width="1920"
      inkscape:window-height="1009"
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg1"
+     inkscape:current-layer="text58"
      showguides="true">
     <inkscape:grid
        id="grid1"
@@ -632,7 +632,7 @@
      inkscape:label="Title"
      aria-label="L. Filter">
     <path
-       style="font-family:Play;-inkscape-font-specification:'Play Bold'"
+       style="font-family:Play;-inkscape-font-specification:'Play Bold';fill:#000000"
        d="M 6.415539,6.4947443 H 6.9511915 V 9.7031368 H 8.7127701 V 10.078646 H 6.415539 Z M 9.2097696,9.4822492 H 9.8503437 V 10.078646 H 9.2097696 Z"
        id="path58" />
     <path
