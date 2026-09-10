@@ -130,7 +130,7 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 <a id="lunar50drone-context-menu"></a>
 **Context menu**
 - **FM topology** — how the "Modulation"-enabled oscillators cross-modulate once the Volt knob passes its midpoint: *Average of active others* (each modulated oscillator is pushed by the average of the other active oscillators) or *Circular chain* (each one modulates the next in a loop).
-- **Oscillator mix** — how the 5 oscillator signals combine into the output level: *Fixed sum / 5 (legacy)* (always divides by 5, so muting oscillators lowers the volume), *Average of active oscillators* (keeps output level constant regardless of how many oscillators are active), or *Soft-clip saturated sum* (sums them and soft-clips, for a driven, denser tone).
+- **Oscillator mix** — how the 5 oscillator signals combine into the output level: *Fixed sum / 5 (legacy)* (always divides by 5, so muting oscillators lowers the volume), *Average of active oscillators* (keeps output level constant regardless of how many oscillators are active), *Soft-clip saturated sum* (sums them and soft-clips, for a driven, denser tone), or a fixed *2/3/4 oscillators max* divisor (like the legacy mode but calibrated for that many active oscillators, so 2/3/4 oscillators driven hard hit full level without needing all 5 active).
 
 ![Lunar50Drone FM topology submenu](docs/images/Lunar50Drone_Menu_FMTypologies.png) ![Lunar50Drone Oscillator mix submenu](docs/images/Lunar50Drone_Menu_Mix.png)
 

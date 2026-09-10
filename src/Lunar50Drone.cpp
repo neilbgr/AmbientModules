@@ -7,7 +7,7 @@ struct Lunar50Drone : Module {
     static const int NUM_OSC = DroneVoice::NUM_OSC;
     static constexpr float OUTPUT_VOLTAGE = 5.f; // Eurorack ±5V audio convention
 
-    enum MixMode { MIX_FIXED = 0, MIX_AVERAGE_ACTIVE = 1, MIX_SOFT_CLIP = 2 };
+    enum MixMode { MIX_FIXED = 0, MIX_AVERAGE_ACTIVE = 1, MIX_SOFT_CLIP = 2, MIX_MAX2 = 3, MIX_MAX3 = 4, MIX_MAX4 = 5 };
     int mixMode = 0; // 0 = Fixed /5 (legacy), keeps existing patches sounding the same
 
     enum ParamIds {
@@ -164,11 +164,23 @@ struct Lunar50Drone : Module {
             if (envAmount > 0.f) {
                 float mix = voice[c].process(args.sampleTime, args.sampleRate, pitchParams, active, mod, cv, volt);
                 switch (mixMode) {
+                    case MIX_FIXED:
+                        sawOut = OUTPUT_VOLTAGE * mix / NUM_OSC * envAmount; // average of NUM_OSC oscillators, scaled to OUTPUT_VOLTAGE
+                        break;
                     case MIX_AVERAGE_ACTIVE:
                         sawOut = OUTPUT_VOLTAGE * mix / std::max(activeCount, 1) * envAmount;
                         break;
                     case MIX_SOFT_CLIP:
                         sawOut = OUTPUT_VOLTAGE * std::tanh(mix) * envAmount;
+                        break;
+                    case MIX_MAX2:
+                        sawOut = OUTPUT_VOLTAGE * mix / 2.f * envAmount;
+                        break;
+                    case MIX_MAX3:
+                        sawOut = OUTPUT_VOLTAGE * mix / 3.f * envAmount;
+                        break;
+                    case MIX_MAX4:
+                        sawOut = OUTPUT_VOLTAGE * mix / 4.f * envAmount;
                         break;
                     default: // MIX_FIXED
                         sawOut = OUTPUT_VOLTAGE * mix / NUM_OSC * envAmount; // average of NUM_OSC oscillators, scaled to OUTPUT_VOLTAGE
@@ -247,7 +259,7 @@ struct Lunar50DroneWidget : ModuleWidget {
             }
         ));
         menu->addChild(createIndexSubmenuItem("Oscillator mix",
-            {"Fixed sum / 5 (legacy)", "Average of active oscillators", "Soft-clip saturated sum"},
+            {"Fixed sum / 5 (legacy)", "Average of active oscillators", "Soft-clip saturated sum", "2 oscillators max", "3 oscillators max", "4 oscillators max"},
             [=]() { return module->mixMode; },
             [=](int mode) {
                 pushIntFieldChange(module, "change oscillator mix", module->mixMode, mode,
