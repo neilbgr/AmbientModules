@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "PanelTheme.hpp"
 #include "Widgets.hpp"
+#include "FilterExpanderMessage.hpp"
 #include "dsp/EnvelopeFollower.hpp"
 
 // 9-voice panoramic mixer (SOLAR 42F manual p.21: Drone1, Drone2, Drone3,
@@ -35,8 +36,15 @@ struct LunarMixer : Module {
     enum LightIds {
         ENUMS(METER_L_LIGHT, NUM_METER_LEDS),
         ENUMS(METER_R_LIGHT, NUM_METER_LEDS),
+        FILTER_EXPANDER_LIGHT,
         NUM_LIGHTS
     };
+
+    // 0 = show an adjacent LunarFilter's output on the meter (default, see
+    // process()); 1 = force the Mixer's own output even if a Filter is
+    // adjacent. Only ever reachable through the context menu, and only when
+    // a Filter is actually adjacent (see appendContextMenu()).
+    int preferMixerOutput = 0;
 
     float gainL[NUM_CHANNELS] = {};
     float gainR[NUM_CHANNELS] = {};
@@ -94,6 +102,20 @@ struct LunarMixer : Module {
         configSwitch(VU_PEAK_PARAM, 0.f, 1.f, 0.f, "Meter ballistics", {"VU", "Peak"});
         configOutput(OUTPUT_L, "Left");
         configOutput(OUTPUT_R, "Right");
+        configLight(FILTER_EXPANDER_LIGHT, "Meter source")->description =
+            "Lit: meter shows the adjacent LunarFilter's output\nUnlit: meter shows the Mixer's own output";
+    }
+
+    json_t* dataToJson() override {
+        json_t* rootJ = json_object();
+        json_object_set_new(rootJ, "preferMixerOutput", json_integer(preferMixerOutput));
+        return rootJ;
+    }
+
+    void dataFromJson(json_t* rootJ) override {
+        if (json_t* j = json_object_get(rootJ, "preferMixerOutput")) {
+            preferMixerOutput = json_integer_value(j);
+        }
     }
 
     void updateMeterLights(int firstLightId, float level) {
@@ -133,11 +155,26 @@ struct LunarMixer : Module {
         outputs[OUTPUT_L].setVoltage(finalL);
         outputs[OUTPUT_R].setVoltage(finalR);
 
+        // If a LunarFilter is patched directly to our right, show its
+        // (post-distortion) output on the meter instead of our own —
+        // see FilterExpanderMessage.hpp for the message convention.
+        Module* rightNeighbor = rightExpander.module;
+        bool filterAdjacent = rightNeighbor && rightNeighbor->model == modelLunarFilter;
+        bool showFilterOutput = filterAdjacent && preferMixerOutput == 0;
+        lights[FILTER_EXPANDER_LIGHT].setBrightness(showFilterOutput ? 1.f : 0.f);
+
+        float meterInL = finalL, meterInR = finalR;
+        if (showFilterOutput) {
+            auto* msg = static_cast<FilterExpanderMessage*>(rightNeighbor->leftExpander.consumerMessage);
+            meterInL = msg->outL;
+            meterInR = msg->outR;
+        }
+
         bool peakMode = params[VU_PEAK_PARAM].getValue() > 0.5f;
         float attackLambda = peakMode ? PEAK_ATTACK_LAMBDA : VU_LAMBDA;
         float releaseLambda = peakMode ? PEAK_RELEASE_LAMBDA : VU_LAMBDA;
-        float envL = meterFollowerL.process(args.sampleTime, finalL / METER_FULLSCALE_V, attackLambda, releaseLambda);
-        float envR = meterFollowerR.process(args.sampleTime, finalR / METER_FULLSCALE_V, attackLambda, releaseLambda);
+        float envL = meterFollowerL.process(args.sampleTime, meterInL / METER_FULLSCALE_V, attackLambda, releaseLambda);
+        float envR = meterFollowerR.process(args.sampleTime, meterInR / METER_FULLSCALE_V, attackLambda, releaseLambda);
 
         if (meterLightDivider.process()) {
             updateMeterLights(METER_L_LIGHT, envL);
@@ -193,6 +230,7 @@ struct LunarMixerWidget : ModuleWidget {
         // VU/Peak meter: 2 columns of 16 LEDs (L/R), in the reserved
         // 42.28-52.28mm x 13-78mm zone; ballistics switch above MASTER_VOL.
         addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(xOut, 79.f)), module, LunarMixer::VU_PEAK_PARAM));
+        addChild(createLightCentered<SmallLight<BlueLight>>(mm2px(Vec(xOut, 75.f)), module, LunarMixer::FILTER_EXPANDER_LIGHT));
 
         const float meterTop = 13.f, meterBottom = 73.f;
         const float meterPitch = (meterBottom - meterTop) / LunarMixer::NUM_METER_LEDS;
@@ -219,7 +257,24 @@ struct LunarMixerWidget : ModuleWidget {
     }
 
     void appendContextMenu(Menu* menu) override {
+        LunarMixer* module = dynamic_cast<LunarMixer*>(this->module);
+        assert(module);
+
         appendAmbientThemeMenu(menu);
+
+        Module* rightNeighbor = module->rightExpander.module;
+        if (rightNeighbor && rightNeighbor->model == modelLunarFilter) {
+            menu->addChild(new MenuSeparator);
+            menu->addChild(createIndexSubmenuItem("Meter shows",
+                {"Filter output (adjacent)", "Mixer output"},
+                [=]() { return module->preferMixerOutput; },
+                [=](int index) {
+                    pushIntFieldChange(module, "change meter source", module->preferMixerOutput, index,
+                        [](engine::Module* m, int v) { dynamic_cast<LunarMixer*>(m)->preferMixerOutput = v; });
+                    module->preferMixerOutput = index;
+                }
+            ));
+        }
     }
 };
 

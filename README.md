@@ -286,12 +286,16 @@ The SOLAR 42F's 9-channel panoramic mixer page: one row per channel (In / Level 
 - **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6 level** — one knob per channel, 0–100%.
 - **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6 pan** — constant-power pan per channel, hard left to hard right.
 - **Master level** — overall output level after the pan/sum stage.
+- **VU/Peak** — selects the Meter LEDs' ballistics (see LEDs below): **VU** (symmetric ~300ms attack/release, ANSI C16.5-style averaging) or **Peak** (near-instant attack, ~300ms release, catches transients the VU setting smooths over).
 
 **Inputs**
 - **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6** — one audio input per channel. A polyphonic cable is summed to mono before that channel's own Level/Pan (same convention as Bogaudio's Mix4 and Venom/MindMeld MixMaster's "poly sum" mode) — each channel has a single pair of knobs, not one per polyphonic voice. "Ext. Audio/Preamp" is a general-purpose channel for anything else you want to mix in; on the real hardware it's mutually exclusive with the internal piezo preamp, a distinction that doesn't apply here.
 
 **Outputs**
 - **Left / Right** — the summed, panned, master-level-scaled stereo mix.
+
+**LEDs**
+- **Meter L/R** (16 LEDs per channel, green/yellow/red) — stereo bargraph reading the Left/Right output level *after* Master level, 3dB per LED from -36dB up to +9dB: green from -36dB to -9dB, yellow from -6dB to 0dB, red from +3dB to +9dB (headroom/near-clip warning). Ballistics follow the VU/Peak switch above.
 
 **Patch ideas**
 - Feed [Lunar50Drone](#lunar50drone), [LunarVCO](#lunarvco) (into VCO A and VCO B), and [LunarPapaSrapa](#lunarpapasrapa) (into Drone 3 and Drone 6) into their matching channels here for one shared stereo output with independent level/pan per voice.
@@ -349,6 +353,8 @@ The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 dro
 
 ## LunarDetector
 
+![LunarDetector panel](docs/images/LunarDetector.png)
+
 Reimplements the SOLAR 42F's "CONTACT MIC + ENVELOPE FOLLOWER" block: a preamp, an Attack/Release envelope follower, and a hysteresis gate detector. The real hardware normally reads its internal piezo contact mic unless an external source is patched into its EXT.SOURCE jack, which then takes over instead — there's no piezo to simulate in software, so this module only exposes that external-source path.
 
 **Knobs**
@@ -367,27 +373,31 @@ Reimplements the SOLAR 42F's "CONTACT MIC + ENVELOPE FOLLOWER" block: a preamp, 
 
 ## LunarFilter
 
+![LunarFilter panel](docs/images/LunarFilter.png)
+
 Reimplements the SOLAR 42F's "FILTER" block: two independent 12dB Polivoks-style multimode (Low-pass/Band-pass) filters, meant to follow [LunarMixer](#lunarmixer)'s stereo output, plus a shared distortion stage — same chain as the real hardware (Mixer → Dual filter → Distortion).
 
-Only Filter L's frequency can be modulated by CV; Link, when on, makes Filter R's effective frequency (knob + CV) follow Filter L's instead of using its own Frequency knob. Resonance and the Low-pass/Band-pass switch always stay independent per filter, whether Link is on or not — confirmed against Elta Music's own demo videos of the hardware.
+The real hardware only exposes one CV input (Filter L's frequency only); this module adds a second, fully independent CV/amount pair for Filter R. With Link off, CV L/MOD L drives Filter L's frequency and CV R/MOD R drives Filter R's, completely independently. With Link on, both sum onto Filter L's frequency instead (Filter R's own Frequency knob and its CV R contribution are bypassed, following Filter L's effective frequency as usual). Resonance and the Low-pass/Band-pass switch always stay independent per filter, whether Link is on or not — confirmed against Elta Music's own demo videos of the hardware.
 
 **Knobs**
 - **Frequency L/R** — filter cutoff, 20Hz to 20kHz. Filter R's Frequency knob is bypassed while Link is on.
 - **Resonance L/R** — always independent, even with Link on. High resonance can self-oscillate; the filter's feedback path is soft-clipped so it settles at a stable, bounded amplitude rather than blowing up.
 - **Type L/R** — Low-pass or Band-pass, always independent, even with Link on.
-- **CV amount** — depth of the CV input's effect on Filter L's frequency (and, if Link is on, Filter R's too).
+- **CV L/R amount** — depth of CV L/CV R's effect on frequency, independent per side (see Inputs below for how they combine under Link).
 - **Distortion blend** — crossfades between the clean filtered signal and the distorted one.
 - **Distortion amount** — drive into the distortion stage's soft clipper.
 - **Link** — Filter R's effective frequency follows Filter L's (see above) instead of its own Frequency knob.
 
 **Inputs**
 - **In L/R** — stereo audio input.
-- **CV** — modulates Filter L's frequency only (see above).
+- **CV L** — modulates Filter L's frequency (always), scaled by CV L amount.
+- **CV R** — modulates Filter R's frequency while Link is off, scaled by CV R amount; while Link is on, sums onto Filter L's frequency instead (which Filter R then follows, same as always under Link) — still scaled by its own CV R amount knob either way.
 
 **Outputs**
 - **Out L/R** — stereo output, after both filters and the shared distortion stage.
 
 **Patch ideas**
 - Feed [LunarMixer](#lunarmixer)'s Left/Right outputs directly into In L/R for the hardware's full Mixer → Filter chain.
-- Turn Link on and patch a slow [LunarLFO](#lunarlfo) into CV for a filter sweep that moves both channels together.
+- Turn Link on and patch a slow [LunarLFO](#lunarlfo) into CV L or CV R for a filter sweep that moves both channels together.
+- Turn Link off and patch a MIDI CC (via a MIDI-to-CV module) into CV L and [LunarLFO](#lunarlfo) into CV R for two independently modulated filter cutoffs.
 
