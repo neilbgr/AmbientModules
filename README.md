@@ -46,7 +46,7 @@
 
 ![Solar42-patch.vcv](docs/images/Solar42-Patch.png)
 
-[**Solar42-patch.vcv**](patches/Solar42-patch.vcv) — a full-rack patch reassembling the SOLAR 42F's own architecture out of these modules: 4× Lunar50Drone (Drone 1/2/4/5, Oscillator mix set to *Fixed sum / 5 (legacy)* to match the real hardware's mixing) and 2× LunarPapaSrapa (Drone 3/6) gated from LunarPads, 2× LunarVCO (VCO A/B, cross-modulating each other's FM and both driven from the same MIDI keyboard), all summed through LunarMixer, plus LunarSequencer/LunarLFO/LunarJoystick for modulation. Uses Cardinal's HostMIDI/HostAudio2 for keyboard input and audio output, so it's meant to be opened in Cardinal rather than standalone VCV Rack (drag the file onto the Cardinal window, or File → Open).
+[**Solar42-patch.vcv**](patches/Solar42-patch.vcv) — a full-rack patch reassembling the SOLAR 42F's own architecture out of these modules: 4× Lunar50Drone (Drone 1/2/4/5, Oscillator mix set to *Fixed sum / 5 (legacy)* to match the real hardware's mixing) and 2× LunarPapaSrapa (Drone 3/6) gated from LunarPads, 2× LunarVCO (VCO A/B, cross-modulating each other's FM and both driven from the same MIDI keyboard), all summed through LunarMixer and into LunarFilter (Filter L's cutoff modulated by a LunarLFO, Filter R's by a MIDI CC) before Cardinal's HostAudio2 output, plus LunarSequencer/LunarLFO/LunarJoystick for modulation and an unpatched LunarDetector included alongside for reference. Uses Cardinal's HostMIDI/HostAudio2 for keyboard input and audio output, so it's meant to be opened in Cardinal rather than standalone VCV Rack (drag the file onto the Cardinal window, or File → Open).
 
 ## Panel themes
 
