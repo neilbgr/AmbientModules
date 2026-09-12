@@ -87,7 +87,7 @@
     {
       "slug": "LunarFilter",
       "name": "LunarFilter",
-      "description": "Dual 12dB Polivoks-style multimode (Low-pass/Band-pass) filter with a shared cutoff CV, Link, and a shared distortion stage",
+      "description": "Dual 12dB Polivoks-style multimode (Low-pass/Band-pass) filter with independent per-side CV, Link, a shared distortion stage with CV, and a stereo FX-insert loop (Send/Return, Blend, Master)",
       "manualUrl": "https://github.com/neilbgr/AmbientModules/blob/main/README.md#lunarfilter",
       "tags": ["Filter", "Distortion", "Dual"]
     }

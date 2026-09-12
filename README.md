@@ -82,7 +82,7 @@ Right-click any AmbientModules module to open its context menu. One entry is ide
 
 ![Theme submenu](docs/images/Menu_Themes.png)
 
-Some modules add extra entries of their own — those are documented under the module in question ([Lunar50Drone](#lunar50drone-context-menu), [LunarLFO](#lunarlfo-context-menu), [LunarSequencer](#lunarsequencer-context-menu), [LunarMixer](#lunarmixer-context-menu), [LunarPads](#lunarpads-context-menu)). LunarVCO, LunarPapaSrapa, LunarJoystick, LunarDetector, LunarFilter, and Blank have no module-specific entries.
+Some modules add extra entries of their own — those are documented under the module in question ([Lunar50Drone](#lunar50drone-context-menu), [LunarLFO](#lunarlfo-context-menu), [LunarSequencer](#lunarsequencer-context-menu), [LunarMixer](#lunarmixer-context-menu), [LunarPads](#lunarpads-context-menu), [LunarFilter](#lunarfilter-context-menu)). LunarVCO, LunarPapaSrapa, LunarJoystick, LunarDetector, and Blank have no module-specific entries.
 
 ## Shared conventions
 
@@ -312,7 +312,7 @@ The SOLAR 42F's 9-channel panoramic mixer page: one row per channel (In / Level 
 
 ![LunarFilter panel](docs/images/LunarFilter.png)
 
-Reimplements the SOLAR 42F's "FILTER" block: two independent 12dB Polivoks-style multimode (Low-pass/Band-pass) filters, meant to follow [LunarMixer](#lunarmixer)'s stereo output, plus a shared distortion stage — same chain as the real hardware (Mixer → Dual filter → Distortion).
+Reimplements the SOLAR 42F's "FILTER" block: two independent 12dB Polivoks-style multimode (Low-pass/Band-pass) filters, meant to follow [LunarMixer](#lunarmixer)'s stereo output, plus a shared distortion stage — same chain as the real hardware (Mixer → Dual filter → Distortion). Past the distortion stage, this module also adds a practical (not hardware-faithful) stereo FX-insert loop, for patching an arbitrary external effects chain in before the final Master level: Filter+Distortion → **Send** → *(your effects)* → **Return** → Blend → Master → Out.
 
 The real hardware only exposes one CV input (Filter L's frequency only); this module adds a second, fully independent CV/amount pair for Filter R. With Link off, CV L/MOD L drives Filter L's frequency and CV R/MOD R drives Filter R's, completely independently. With Link on, both sum onto Filter L's frequency instead (Filter R's own Frequency knob and its CV R contribution are bypassed, following Filter L's effective frequency as usual). Resonance and the Low-pass/Band-pass switch always stay independent per filter, whether Link is on or not — confirmed against Elta Music's own demo videos of the hardware.
 
@@ -320,23 +320,36 @@ The real hardware only exposes one CV input (Filter L's frequency only); this mo
 - **Frequency L/R** — filter cutoff, 20Hz to 20kHz. Filter R's Frequency knob is bypassed while Link is on.
 - **Resonance L/R** — always independent, even with Link on. High resonance can self-oscillate; the filter's feedback path is soft-clipped so it settles at a stable, bounded amplitude rather than blowing up.
 - **Type L/R** — Low-pass or Band-pass, always independent, even with Link on.
-- **CV L/R amount** — depth of CV L/CV R's effect on frequency, independent per side (see Inputs below for how they combine under Link).
+- **CV L/R amount** — bipolar attenuverter for CV L/CV R's effect on frequency, independent per side (negative inverts the CV) — see Inputs below for how they combine under Link.
 - **Distortion blend** — crossfades between the clean filtered signal and the distorted one.
+- **Distortion blend CV amount** — bipolar attenuverter for the Distortion CV input (see Inputs below), same convention as [Lunar50Drone](#lunar50drone)'s CV Attenuverter.
 - **Distortion amount** — drive into the distortion stage's soft clipper.
 - **Link** — Filter R's effective frequency follows Filter L's (see above) instead of its own Frequency knob.
+- **Insert blend** — single knob, shared by both channels: crossfades between the dry (pre-Send) signal and whatever comes back on Return. At 0 (default), Return is ignored entirely — the insert loop is inaudible until you turn this up, so an empty patch or one with nothing in the loop sounds identical to before this feature existed.
+- **Insert blend CV amount** — bipolar attenuverter for the Insert blend CV input (see Inputs below), same convention as [Lunar50Drone](#lunar50drone)'s CV Attenuverter.
+- **Master level** — final stereo volume, after the insert loop, same simple 0–100% convention as [LunarMixer](#lunarmixer)'s Master level.
 
 **Inputs**
 - **In L/R** — stereo audio input.
 - **CV L** — modulates Filter L's frequency (always), scaled by CV L amount.
 - **CV R** — modulates Filter R's frequency while Link is off, scaled by CV R amount; while Link is on, sums onto Filter L's frequency instead (which Filter R then follows, same as always under Link) — still scaled by its own CV R amount knob either way.
+- **Distortion CV** — modulates the Distortion blend knob, scaled by Distortion blend CV amount, summed onto the knob and clamped to its 0–100% range.
+- **Return L/R** — the insert loop's return from your external effects chain. Normalled to the dry signal when nothing's patched, so the loop stays transparent until you actually return something. In the *1 poly jack* Send/Return I/O mode (see [Context menu](#lunarfilter-context-menu) below), only Return L is used, carrying a 2-channel poly cable (channel 0 = L, channel 1 = R) — Return R is hidden in that mode.
+- **Insert blend CV** — modulates the Insert blend knob, scaled by Insert blend CV amount, summed onto the knob and clamped to its 0–100% range.
 
 **Outputs**
-- **Out L/R** — stereo output, after both filters and the shared distortion stage.
+- **Out L/R** — stereo output, after both filters, the shared distortion stage, and the insert loop/Master level.
+- **Send L/R** — the insert loop's send to your external effects chain (post-filter, post-distortion, pre-Blend). In the *1 poly jack* Send/Return I/O mode, only Send L is used, carrying a 2-channel poly cable (channel 0 = L, channel 1 = R) — Send R is hidden in that mode.
+
+<a id="lunarfilter-context-menu"></a>
+**Context menu**
+- **Send/Return I/O** — *2 mono jacks (L/R)* (default): Send L/R and Return L/R are four separate jacks. *1 poly jack (2ch bus on Left)*: Send R and Return R are hidden, and Send L/Return L instead carry a 2-channel poly cable each (L=channel 0, R=channel 1) — lets a genuinely polyphonic external module (e.g. Fundamental's own VCF, which has a single poly cable in/out and no L/R jacks at all) sit directly in the insert loop without extra merge/split utility modules. Switching modes clears any cable patched into the jack(s) being hidden.
 
 **Patch ideas**
 - Feed [LunarMixer](#lunarmixer)'s Left/Right outputs directly into In L/R for the hardware's full Mixer → Filter chain.
 - Turn Link on and patch a slow [LunarLFO](#lunarlfo) into CV L or CV R for a filter sweep that moves both channels together.
 - Turn Link off and patch a MIDI CC (via a MIDI-to-CV module) into CV L and [LunarLFO](#lunarlfo) into CV R for two independently modulated filter cutoffs.
+- Patch Send L/R into a stereo effect (or Fundamental's VCF in *1 poly jack* mode) and its output back into Return L/R, then use Insert blend as a wet/dry mix, or patch an LFO/envelope into Insert blend CV for a moving wet/dry mix.
 
 ## LunarJoystick
 

@@ -37,6 +37,20 @@ struct RoganMedSmallOrange : Rogan {
     }
 };
 
+// Full-size Rogan1PS (~10.5mm, same as stock Rogan1PSRed used by
+// LunarDetector/LunarLFO), recolored #eb8a41 the same way RoganMedSmallOrange
+// above was derived from White — for a LunarFilter knob that needs to stand
+// out at that larger stock size rather than the pack's usual ~8.4mm MedSmall
+// knobs. Shares the stock Rack SDK bg ring (asset::system) like Rogan1PSRed/
+// Blue/Green/White do, since that ring art is identical across all of them.
+struct RoganOrange : Rogan {
+    RoganOrange() {
+        setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSOrange.svg")));
+        bg->setSvg(Svg::load(asset::system("res/ComponentLibrary/Rogan1PS_bg.svg")));
+        fg->setSvg(Svg::load(asset::plugin(pluginInstance, "res/knobs/Rogan1PSOrange-fg.svg")));
+    }
+};
+
 // Same small-diameter red Rogan Valley/Plateau uses for its "Predelay" knob
 // (RoganSmallRed in plugins/ValleyAudio/src/gui/ValleyComponents.hpp:140-146)
 // — ~5.2mm, noticeably smaller than the stock Rogan1PSRed (~10.5mm) or even
