@@ -296,8 +296,8 @@ struct LunarFilterWidget : ModuleWidget {
         const float y8 = y7 + dy;
         const float y9 = y8 + dy;
         const float y10 = y9 + dy;
-        const float y11 = y10 + dy;
-        const float y12 = y11 + dy;
+        // const float y11 = y10 + dy; // unused
+        // const float y12 = y11 + dy; // unused
 
         addParam(createParamCentered<CKSS>(mm2px(Vec(x1, y1)), module, LunarFilter::TYPE_L_PARAM));
         addParam(createParamCentered<CKSS>(mm2px(Vec(x3, y1)), module, LunarFilter::TYPE_R_PARAM));
