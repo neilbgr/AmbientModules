@@ -1,6 +1,6 @@
 # AmbientModules — User Manual
 
-**AmbientModules** is a small collection of VCV Rack / Cardinal modules inspired by the [Elta Music](https://www.eltamusic.com) [ **SOLAR 42F** "Ambient Drone Machine"](https://www.eltamusic.com/solar-42f)  — an analogue microtonal drone synthesizer. Rather than reproducing the SOLAR 42F's fixed hardware layout, each of its sound engines is broken out here into an independent, freely-patchable Rack module:
+**AmbientModules** is a collection of VCV Rack / Cardinal modules inspired by the [Elta Music](https://www.eltamusic.com) [ **SOLAR 42F** "Ambient Drone Machine"](https://www.eltamusic.com/solar-42f)  — an analog microtonal drone synthesizer. Rather than reproducing the SOLAR 42F's fixed hardware layout, each of its sound engines is broken out here into an independent, freely-patchable Rack module:
 
 ![All AmbientModules panels, Cream theme](docs/images/AllModules_Cream.png)
 
@@ -10,7 +10,7 @@
 | [Lunar50Drone](#lunar50drone)     | 5-oscillator sawtooth drone with a shared envelope | Drone voices 1, 2, 4, 5 "Classic Solar 50" |
 | [LunarVCO](#lunarvco)             | AS3340-style VCO with ADSR and hard sync           | Voices "VCO A / VCO B"                     |
 | [LunarPapaSrapa](#lunarpapasrapa) | FM/AM cross-modulated noise/drone voice            | Drone voices 3, 6 "Papa Srapa"             |
-| [LunarLFO](#lunarlfo)             | Dual unipolar triangle/square LFO                  | LFOs                                       |
+| [LunarLFO](#lunarlfo)             | Dual triangle/square LFO                  | LFOs (Unipolar)                                       |
 | [LunarSequencer](#lunarsequencer) | 3-to-5-stage Buchla-inspired CV/gate sequencer     | Sequencer                                  |
 | [LunarMixer](#lunarmixer)         | 9-channel panoramic mixer with master level        | Mixer page                                 |
 | [LunarFilter](#lunarfilter)       | Dual 12dB Polivoks-style multimode filter + distortion | Filter block                          |
@@ -105,8 +105,8 @@ An empty panel with no parameters, inputs, or outputs — a spacer/template modu
 Five simple sawtooth oscillators sharing one output and one envelope — the Classic Solar 50 drone voice. Each of the 5 oscillators can be switched on or off independently to build chords and triads, and the **Volt** knob detunes and then cross-modulates them together for FM-style drone textures, exactly as on the original hardware.
 
 **Knobs & switches**
-- **Oscillator 1–5 frequency** — one knob per oscillator, octave-linear tuning centered on C4.
 - **Oscillator 1–5 active** (lit button) — mutes/unmutes that oscillator. Can also be toggled from the corresponding trigger input. Not polyphonic: it's a single on/off state per oscillator, shared identically by every poly channel — there's no per-channel "active" state. Oscillator 1 defaults to active, the other four to inactive, so a freshly-added module produces sound immediately instead of silence.
+- **Oscillator 1–5 frequency** — one knob per oscillator, octave-linear tuning centered on C4.
 - **Oscillator 1–5 modulation** (lit button) — enables that oscillator's contribution to the cross-modulation described below. Oscillator 1 defaults to on, the other four to off.
 - **CV Attenuverter** — scales the incoming Frequency CV (±100%, defaults to +100%) before it's applied to all 5 oscillators together, so it shifts their combined pitch while preserving the intervals between them. ⚠️ Following the real SOLAR 42F, an oscillator only responds to Frequency CV once its own **Modulation** button is enabled — with the attenuverter at its default +100%, enabling Modulation on an oscillator is normally enough on its own; turn the attenuverter down (or all the way to 0%) if you want to reduce or fully disable Frequency CV's effect on every oscillator at once. This gating-by-Modulation-button is by design, not a bug: it mirrors the original hardware's per-oscillator "modulation enable" switch.
 - **Volt** — transposes all 5 oscillators down together, independently of the Modulation buttons/CV Attenuverter above; past roughly the halfway point of the knob's travel, they also start frequency-modulating each other (see [Context menu](#lunar50drone-context-menu) for how that cross-modulation is wired), for the same FM synthesis effect described in the original SOLAR 42F documentation.
@@ -114,15 +114,15 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 - **Hold** (lit button) — see [Shared conventions](#shared-conventions).
 
 **Inputs**
-- **Frequency CV** — sums (through the CV Attenuverter) onto all 5 oscillators at once.
 - **Oscillator 1–5 trigger** — toggles the corresponding oscillator's Active state on a rising edge. Monophonic (channel 1 only, even from a polyphonic cable) — matches the Active button it drives, which isn't per-channel either.
+- **Frequency CV** — sums (through the CV Attenuverter) onto all 5 oscillators at once.
 - **Volt CV** — 0–10V, adds to the Volt knob; polyphonic, read independently per channel.
-- **Gate** — opens the shared envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 - **Envelope CV** — see [Shared conventions](#shared-conventions).
+- **Gate** — opens the shared envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 
 **Outputs**
-- **Sawtooth mix** — the combined, enveloped audio output.
 - **Envelope** — 0–10V copy of the envelope currently shaping the mix.
+- **Sawtooth mix** — the combined, enveloped audio output.
 
 **LEDs**
 - **Envelope** (yellow, standalone) — brightness follows the envelope's current level, so it glows brighter as the drone swells and dims as it releases.
@@ -146,28 +146,28 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 
 **Knobs & switches**
 - **Waveform** — 6 positions: Sine, Triangle, Inverted saw, Square, Saw-to-inverted-saw (morphed by Shape), Sine-to-saw (morphed by Shape).
+- **Sub oscillator** (lit button) — adds a sub-oscillator one octave below.
+- **Shape** — pulse width (square) or morph blend (the two morphing waveforms), plus its CV amount attenuverter.
 - **Tune** — ±0.5 octave fine tune.
 - **Octave** (lit button) — Low or +3 octaves.
-- **Sub oscillator** (lit button) — adds a sub-oscillator one octave below.
 - **FM mode** (lit button) — Linear or Exponential FM response for the FM input.
-- **Shape** — pulse width (square) or morph blend (the two morphing waveforms), plus its CV amount attenuverter.
 - **FM amount** — attenuverter for the FM input.
 - **Attack / Decay / Sustain / Release** — the built-in ADSR envelope.
-- **Hold** (lit button) — see [Shared conventions](#shared-conventions).
 - **Self-generation** (lit button) — turns the envelope generator into a free-running LFO instead of a one-shot envelope, cycling Attack/Release only (Decay is skipped); Attack and Release should be turned low (towards 9 o'clock) for this to cycle usefully, and Sustain sets its peak depth. Still needs Gate to have gone high at least once (or Hold engaged) to start — it doesn't cycle on its own from silence.
+- **Hold** (lit button) — see [Shared conventions](#shared-conventions).
 
 **Inputs**
+- **Sync** — hard-syncs the oscillator's phase to the incoming signal.
+- **Shape CV** — modulates the Shape knob, scaled by its attenuverter.
 - **V/oct** — pitch, standard 1V/octave.
 - **FM** — linear or exponential frequency modulation (mode set by the FM mode switch), scaled by the FM amount knob.
-- **Shape CV** — modulates the Shape knob, scaled by its attenuverter.
-- **Sync** — hard-syncs the oscillator's phase to the incoming signal.
-- **Gate** — opens the ADSR envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 - **Envelope CV** — see [Shared conventions](#shared-conventions).
+- **Gate** — opens the ADSR envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 
 **Outputs**
-- **Audio Out** — the enveloped (VCA'd) oscillator signal.
 - **Envelope Out** — 0–10V copy of the ADSR currently shaping Audio Out.
 - **OSC Out** — raw, unenveloped oscillator phase (±5V ramp); mirrors the hardware's VCO B "OSC" output. Patch it into another LunarVCO's Sync input to hard-sync that oscillator to this one.
+- **Audio Out** — the enveloped (VCA'd) oscillator signal.
 
 **LEDs**
 - **Envelope** (yellow, standalone) — brightness follows the ADSR's current level, glowing brighter through Attack/Sustain and dimming through Decay/Release.
@@ -184,10 +184,10 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modulator cross-modulating an audio-rate square oscillator (FM and/or AM), blended with independent white noise, plus a built-in sample & hold and envelope.
 
 **Knobs & switches**
-- **Rate** — the modulator's frequency, from 1Hz up to ~C4.
-- **FM** (lit button) — routes the modulator into the audio oscillator's frequency.
-- **AM** (lit button) — routes the modulator into the audio oscillator's amplitude. FM and AM can be enabled together.
+- **LFO** — the modulator's frequency, from 1Hz up to ~C4.
+- **fm** (lit button) — routes the modulator into the audio oscillator's frequency.
 - **Modulation depth** — how strongly the modulator affects the audio oscillator, plus its CV input.
+- **am** (lit button) — routes the modulator into the audio oscillator's amplitude. FM and AM can be enabled together.
 - **Divider** — divides down the modulator's frequency relative to the audio oscillator, plus its CV input.
 - **Pitch** — the audio oscillator's pitch, spanning C0 to E7.
 - **Noise** — mix level of the internal white noise source, shared across every polyphonic voice (not decorrelated per voice — the real hardware only has one noise generator per module).
@@ -196,22 +196,22 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 - **Hold** (lit button) — see [Shared conventions](#shared-conventions).
 
 **Inputs**
-- **Pitch CV** — 1V/oct, sums onto the Pitch knob.
 - **Modulation depth CV**, **Divider CV** — sum onto their respective knobs; polyphonic, read independently per channel, each driving its own per-channel modulator (see LFO output below) — so different channels can have their own FM/AM depth and modulator rate.
-- **Sample & hold clock** — samples a new value on each rising edge; polyphonic, with its own channel count driven by Sample & hold clock/input (independent from the rest of the panel — see Outputs below).
+- **Pitch CV** — 1V/oct, sums onto the Pitch knob.
 - **Sample & hold input** — the source to sample; normalled to the internal noise generator when nothing is patched here; polyphonic, same channel count as Sample & hold clock.
-- **Gate** — opens the envelope while high (ignored if Hold is engaged or Envelope CV is patched).
+- **Sample & hold clock** — samples a new value on each rising edge; polyphonic, with its own channel count driven by Sample & hold clock/input (independent from the rest of the panel — see Outputs below).
 - **Envelope CV** — see [Shared conventions](#shared-conventions).
+- **Gate** — opens the envelope while high (ignored if Hold is engaged or Envelope CV is patched).
 
 **Outputs**
-- **VCO (enveloped)** — the main cross-modulated/noise audio output, shaped by the envelope.
 - **LFO** — the raw low-frequency modulator signal, always running while patched; polyphonic — each channel gets its own independent modulator (see Modulation depth CV / Divider CV above), unlike the real hardware's single LFO per module.
 - **Sample & hold** — the current sampled value; polyphonic, with its own channel count driven by the Sample & hold Signal/Clock inputs — independent from Pitch CV/Gate/Envelope CV, since S&H is a self-contained section of the panel.
 - **Envelope** — 0–10V copy of the envelope currently shaping VCO Out.
+- **VCO (enveloped)** — the main cross-modulated/noise audio output, shaped by the envelope.
 
 **LEDs**
-- **Envelope** (yellow, standalone) — brightness follows the envelope's current level.
 - **Sample & Hold** (blue, standalone) — flashes with each new sample on channel 1, brightness proportional to that channel's sampled value's magnitude (a single LED can't show all channels at once).
+- **Envelope** (yellow, standalone) — brightness follows the envelope's current level.
 
 **Patch ideas**
 - Turn on both FM and AM with a fast Rate and high Modulation depth for the "sirens and space monsters" sounds the original Papa Srapa circuit is known for.
@@ -251,8 +251,8 @@ A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step sto
 **Knobs & switches**
 - **Pulser rate** — speed of the internal clock, used whenever nothing is patched into Clock In. The internal pulser is a clean ~50%-duty square wave (not a ramp/sawtooth) — same shape whether it's driving Clock Out or advancing the steps internally.
 - **Stages** — sets the sequence length to 3, 4, or 5 steps. ⚠️ Following the original SOLAR 42F hardware switch (a vertical lever read top to bottom as 4, 5, 3), this module's own horizontal switch reads left to right as **3, 5, 4** rather than the more intuitive 3, 4, 5. Click directly on the side you want (rather than the current lever position) to jump straight there, like a real toggle switch.
-- **Step 1–5 CV** — each step's output level; the knob's tooltip shows the actual voltage for the currently selected CV Range.
 - **Step 1–5 gate** (lit button) — enables/disables that step's Gate output. This does **not** affect the CV output — a "gate off" step is skipped for triggering, but its CV value still plays when the sequence reaches it.
+- **Step 1–5 CV** — each step's output level; the knob's tooltip shows the actual voltage for the currently selected CV Range.
 
 **Inputs**
 - **Clock In** — external clock/trigger; when connected, it replaces the internal Pulser.
@@ -274,7 +274,6 @@ A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step sto
 
 **Patch ideas**
 - Feed Step CV into [LunarVCO](#lunarvco) or [Lunar50Drone](#lunar50drone)'s pitch/frequency input, and Step gate into their Gate input, for a self-contained melodic sequence.
-- Chain two LunarSequencers by patching one's Clock Out into the other's Clock In to build longer combined patterns.
 
 ## LunarMixer
 
@@ -283,10 +282,12 @@ A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step sto
 The SOLAR 42F's 9-channel panoramic mixer page: one row per channel (In / Level / Pan), summed to a shared stereo output with a master level knob. Straight sum, no automatic gain compensation or soft-clipping — same as the hardware mixer page and the standard Eurorack mixer convention, so gain-stage with the Level knobs directly.
 
 **Knobs**
-- **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6 level** — one knob per channel, 0–100%.
-- **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6 pan** — constant-power pan per channel, hard left to hard right.
+- **volume** — one knob per channel, 0–100%.
+- **pan** — constant-power pan per channel, hard left to hard right.
+- **VU/Peak** — selects the Meter LEDs' ballistics (see LEDs below): 
+  - **VU** (symmetric ~300ms attack/release, ANSI C16.5-style averaging) 
+  - or **Peak** (near-instant attack, ~300ms release, catches transients the VU setting smooths over).
 - **Master level** — overall output level after the pan/sum stage.
-- **VU/Peak** — selects the Meter LEDs' ballistics (see LEDs below): **VU** (symmetric ~300ms attack/release, ANSI C16.5-style averaging) or **Peak** (near-instant attack, ~300ms release, catches transients the VU setting smooths over).
 
 **Inputs**
 - **Drone 1–3, VCO A, Ext. Audio/Preamp, VCO B, Drone 4–6** — one audio input per channel. A polyphonic cable is summed to mono before that channel's own Level/Pan (same convention as Bogaudio's Mix4 and Venom/MindMeld MixMaster's "poly sum" mode) — each channel has a single pair of knobs, not one per polyphonic voice. "Ext. Audio/Preamp" is a general-purpose channel for anything else you want to mix in; on the real hardware it's mutually exclusive with the internal piezo preamp, a distinction that doesn't apply here.
@@ -317,33 +318,36 @@ Reimplements the SOLAR 42F's "FILTER" block: two independent 12dB Polivoks-style
 The real hardware only exposes one CV input (Filter L's frequency only); this module adds a second, fully independent CV/amount pair for Filter R. With Link off, CV L/MOD L drives Filter L's frequency and CV R/MOD R drives Filter R's, completely independently. With Link on, both sum onto Filter L's frequency instead (Filter R's own Frequency knob and its CV R contribution are bypassed, following Filter L's effective frequency as usual). Resonance and the Low-pass/Band-pass switch always stay independent per filter, whether Link is on or not — confirmed against Elta Music's own demo videos of the hardware.
 
 **Knobs**
-- **Frequency L/R** — filter cutoff, 20Hz to 20kHz. Filter R's Frequency knob is bypassed while Link is on.
-- **Resonance L/R** — always independent, even with Link on. High resonance can self-oscillate; the filter's feedback path is soft-clipped so it settles at a stable, bounded amplitude rather than blowing up.
-- **Type L/R** — Low-pass or Band-pass, always independent, even with Link on.
-- **CV L/R amount** — bipolar attenuverter for CV L/CV R's effect on frequency, independent per side (negative inverts the CV) — see Inputs below for how they combine under Link.
-- **Distortion blend** — crossfades between the clean filtered signal and the distorted one.
-- **Distortion blend CV amount** — bipolar attenuverter for the Distortion CV input (see Inputs below), same convention as [Lunar50Drone](#lunar50drone)'s CV Attenuverter.
-- **Distortion amount** — drive into the distortion stage's soft clipper.
-- **Link** — Filter R's effective frequency follows Filter L's (see above) instead of its own Frequency knob.
-- **Insert blend** — single knob, shared by both channels: crossfades between the dry (pre-Send) signal and whatever comes back on Return. At 0 (default), Return is ignored entirely — the insert loop is inaudible until you turn this up, so an empty patch or one with nothing in the loop sounds identical to before this feature existed.
-- **Insert blend CV amount** — bipolar attenuverter for the Insert blend CV input (see Inputs below), same convention as [Lunar50Drone](#lunar50drone)'s CV Attenuverter.
+- **Filters L/R**
+  - **Type L/R** — Low-pass or Band-pass, always independent, even with Link on.    
+  - **Resonance L/R** — always independent, even with Link on. High resonance can self-oscillate; the filter's feedback path is soft-clipped so it settles at a stable, bounded amplitude rather than blowing up.
+  - **Frequency L/R** — filter cutoff, 20Hz to 20kHz. Filter R's Frequency knob is bypassed while Link is on.
+  - **Link** — Filter R's effective frequency follows Filter L's (see above) instead of its own Frequency knob.
+  - **CV L/R amount** — bipolar attenuverter for CV L/CV R's effect on frequency, independent per side (negative inverts the CV) — see Inputs below for how they combine under Link.
+- **Distortion**
+  - **Gain** — drive into the distortion stage's soft clipper.
+  - **Blend** — crossfades between the clean filtered signal and the distorted one.
+  - **Blend CV amount** — bipolar attenuverter for the Distortion CV input (see Inputs below), same convention as [Lunar50Drone](#lunar50drone)'s CV Attenuverter.
+- **Insert FX**
+  - **Insert blend** — single knob, shared by both channels: crossfades between the dry (pre-Send) signal and whatever comes back on Return. At 0 (default), Return is ignored entirely — the insert loop is inaudible until you turn this up, so an empty patch or one with nothing in the loop sounds identical to before this feature existed.
+  - **Insert blend CV amount** — bipolar attenuverter for the Insert blend CV input (see Inputs below), same convention as [Lunar50Drone](#lunar50drone)'s CV Attenuverter.
 - **Master level** — final stereo volume, after the insert loop, same simple 0–100% convention as [LunarMixer](#lunarmixer)'s Master level.
 
 **Inputs**
-- **In L/R** — stereo audio input.
 - **CV L** — modulates Filter L's frequency (always), scaled by CV L amount.
 - **CV R** — modulates Filter R's frequency while Link is off, scaled by CV R amount; while Link is on, sums onto Filter L's frequency instead (which Filter R then follows, same as always under Link) — still scaled by its own CV R amount knob either way.
 - **Distortion CV** — modulates the Distortion blend knob, scaled by Distortion blend CV amount, summed onto the knob and clamped to its 0–100% range.
-- **Return L/R** — the insert loop's return from your external effects chain. Normalled to the dry signal when nothing's patched, so the loop stays transparent until you actually return something. In the *1 poly jack* Send/Return I/O mode (see [Context menu](#lunarfilter-context-menu) below), only Return L is used, carrying a 2-channel poly cable (channel 0 = L, channel 1 = R) — Return R is hidden in that mode.
 - **Insert blend CV** — modulates the Insert blend knob, scaled by Insert blend CV amount, summed onto the knob and clamped to its 0–100% range.
+- **In L/R** — stereo audio input.
+- **Return L/R** — the insert loop's return from your external effects chain. Normalled to the dry signal when nothing's patched, so the loop stays transparent until you actually return something. In the *1 poly jack* Send/Return I/O mode (see [Context menu](#lunarfilter-context-menu) below), only Return L is used, carrying a 2-channel poly cable (channel 0 = L, channel 1 = R) — Return R stays visible but is ignored in that mode.
 
 **Outputs**
+- **Send L/R** — the insert loop's send to your external effects chain (post-filter, post-distortion, pre-Blend). In the *1 poly jack* Send/Return I/O mode, only Send L is used, carrying a 2-channel poly cable (channel 0 = L, channel 1 = R) — Send R stays visible but outputs a fixed 0V (unused) in that mode.
 - **Out L/R** — stereo output, after both filters, the shared distortion stage, and the insert loop/Master level.
-- **Send L/R** — the insert loop's send to your external effects chain (post-filter, post-distortion, pre-Blend). In the *1 poly jack* Send/Return I/O mode, only Send L is used, carrying a 2-channel poly cable (channel 0 = L, channel 1 = R) — Send R is hidden in that mode.
 
 <a id="lunarfilter-context-menu"></a>
 **Context menu**
-- **Send/Return I/O** — *2 mono jacks (L/R)* (default): Send L/R and Return L/R are four separate jacks. *1 poly jack (2ch bus on Left)*: Send R and Return R are hidden, and Send L/Return L instead carry a 2-channel poly cable each (L=channel 0, R=channel 1) — lets a genuinely polyphonic external module (e.g. Fundamental's own VCF, which has a single poly cable in/out and no L/R jacks at all) sit directly in the insert loop without extra merge/split utility modules. Switching modes clears any cable patched into the jack(s) being hidden.
+- **Send/Return I/O** — *2 mono jacks (L/R)* (default): Send L/R and Return L/R are four separate jacks. *1 poly jack (2ch bus on Left)*: Send R and Return R stay visible but go unused, and Send L/Return L instead carry a 2-channel poly cable each (L=channel 0, R=channel 1) — lets a genuinely polyphonic external module (e.g. Fundamental's own VCF, which has a single poly cable in/out and no L/R jacks at all) sit directly in the insert loop without extra merge/split utility modules.
 
 **Patch ideas**
 - Feed [LunarMixer](#lunarmixer)'s Left/Right outputs directly into In L/R for the hardware's full Mixer → Filter chain.
@@ -363,8 +367,8 @@ Electrical equivalent of the SOLAR 42F Joystick block, without the physical stic
 - If the cursor leaves the square on either axis mid-drag, the crosshair freezes exactly where it crossed the edge rather than sliding along it — further mouse movement outside the zone is ignored until the cursor comes back inside on both axes.
 
 **Knobs**
-- **X/Y offset** — adds to that axis's position (manual or CV) after the range rescale below, so it's independent of whichever range is selected.
 - **Range X/Y** (4-position rotary) — the voltage range an external CV source is rescaled from, into the pad's internal ±5V range: *-5V to +5V*, *0V to +10V* (default — e.g. a MIDI CC→CV converter, always unipolar 0–10V), *0V to +5V*, or *-10V to +10V*. CV outside the selected range is clamped to ±5V internally, same as a manual drag can never exceed.
+- **X/Y offset** — adds to that axis's position (manual or CV) after the range rescale below, so it's independent of whichever range is selected.
 
 **Inputs**
 - **X / Y** — CV overriding the pad's manual position on that axis when patched (see above).

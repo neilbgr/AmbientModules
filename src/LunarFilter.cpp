@@ -204,6 +204,11 @@ struct LunarFilter : Module {
             outputs[SEND_L_OUTPUT].setChannels(2);
             outputs[SEND_L_OUTPUT].setVoltage(preInsertL, 0);
             outputs[SEND_L_OUTPUT].setVoltage(preInsertR, 1);
+            // SEND_R_OUTPUT stays visible on the panel in this mode (see the
+            // Send/Return I/O menu below) but is unused — keep it a clean 0V
+            // rather than the stale value it last held in mono-pair mode.
+            outputs[SEND_R_OUTPUT].setChannels(1);
+            outputs[SEND_R_OUTPUT].setVoltage(0.f);
         } else {
             outputs[SEND_L_OUTPUT].setChannels(1);
             outputs[SEND_L_OUTPUT].setVoltage(preInsertL);
@@ -338,24 +343,10 @@ struct LunarFilterWidget : ModuleWidget {
 
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x7, 101.66575f)), module, LunarFilter::OUT_L_OUTPUT));
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x7, 113.16522f)), module, LunarFilter::OUT_R_OUTPUT));
-
-        updateInsertPortVisibility();
-    }
-
-    // Hides the R-side Send/Return jacks when the module is set to the
-    // single-poly-jack bus mode (module == nullptr in the module-browser
-    // preview context, same guard other AmbientModules widgets use — falls
-    // back to the mono-pair layout there).
-    void updateInsertPortVisibility() {
-        LunarFilter* m = dynamic_cast<LunarFilter*>(this->module);
-        bool monoPair = (m == nullptr) || (m->ioMode == LunarFilter::IO_MONO_PAIR);
-        getOutput(LunarFilter::SEND_R_OUTPUT)->visible = monoPair;
-        getInput(LunarFilter::RETURN_R_INPUT)->visible = monoPair;
     }
 
     void step() override {
         syncPanelTheme(this, "LunarFilter", appliedTheme);
-        updateInsertPortVisibility();
         ModuleWidget::step();
     }
 
@@ -373,13 +364,6 @@ struct LunarFilterWidget : ModuleWidget {
                 pushIntFieldChange(module, "change send/return I/O mode", module->ioMode, index,
                     [](engine::Module* m, int v) { dynamic_cast<LunarFilter*>(m)->ioMode = v; });
                 module->ioMode = index;
-                updateInsertPortVisibility();
-                // Only the R-side jacks ever become invisible/unreachable
-                // (the L-side jacks stay visible in both modes, only their
-                // channel count changes) — so they're the only ones that can
-                // end up with a "zombie" cable driving/reading a hidden port.
-                APP->scene->rack->clearCablesOnPort(getOutput(LunarFilter::SEND_R_OUTPUT));
-                APP->scene->rack->clearCablesOnPort(getInput(LunarFilter::RETURN_R_INPUT));
             }
         ));
     }
