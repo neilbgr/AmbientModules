@@ -3,10 +3,18 @@
 
 struct LunarSequencer;
 
-// Step CV knobs display plain volts, computed from the module's *current*
-// cvRangeIndex — a plain configParam unit can't do this since the range is
-// picked at runtime from the context menu, not fixed at construction time.
+// Step CV knobs display and accept plain volts, computed from the module's
+// *current* cvRangeIndex — a plain configParam unit can't do this since the
+// range is picked at runtime from the context menu, not fixed at
+// construction time. getDisplayValue()/setDisplayValue() must both be
+// overridden (not just getDisplayValueString()) — the base ParamQuantity's
+// default setDisplayValueString() parses the typed text and feeds it
+// straight into setDisplayValue(), so without this override typing e.g. "7"
+// would call setValue(7) on the raw 0..1 param (clamped to 1.0) instead of
+// mapping 7V into the active range.
 struct StepCvQuantity : ParamQuantity {
+    float getDisplayValue() override;
+    void setDisplayValue(float displayValue) override;
     std::string getDisplayValueString() override;
 };
 
@@ -210,12 +218,22 @@ struct LunarSequencer : Module {
 
 constexpr float LunarSequencer::cvRanges[4][2];
 
-std::string StepCvQuantity::getDisplayValueString() {
+float StepCvQuantity::getDisplayValue() {
     LunarSequencer* m = dynamic_cast<LunarSequencer*>(module);
     float rangeMin = LunarSequencer::cvRanges[m->cvRangeIndex][0];
     float rangeMax = LunarSequencer::cvRanges[m->cvRangeIndex][1];
-    float volts = rangeMin + getValue() * (rangeMax - rangeMin);
-    return string::f("%.2fV", volts);
+    return rangeMin + getValue() * (rangeMax - rangeMin);
+}
+
+void StepCvQuantity::setDisplayValue(float displayValue) {
+    LunarSequencer* m = dynamic_cast<LunarSequencer*>(module);
+    float rangeMin = LunarSequencer::cvRanges[m->cvRangeIndex][0];
+    float rangeMax = LunarSequencer::cvRanges[m->cvRangeIndex][1];
+    setValue((displayValue - rangeMin) / (rangeMax - rangeMin));
+}
+
+std::string StepCvQuantity::getDisplayValueString() {
+    return string::f("%.2fV", getDisplayValue());
 }
 
 struct LunarSequencerWidget : ModuleWidget {
@@ -269,9 +287,46 @@ struct LunarSequencerWidget : ModuleWidget {
             {"0V to +5V", "0V to +10V", "-5V to +5V", "-10V to +10V"},
             [=]() { return module->cvRangeIndex; },
             [=](int index) {
-                pushIntFieldChange(module, "change CV range", module->cvRangeIndex, index,
-                    [](engine::Module* m, int v) { dynamic_cast<LunarSequencer*>(m)->cvRangeIndex = v; });
+                int oldIndex = module->cvRangeIndex;
+                if (index == oldIndex) {
+                    return;
+                }
+
+                history::ComplexAction* complexAction = new history::ComplexAction;
+                complexAction->name = "change CV range";
+
+                pushIntFieldChange(module, "change CV range", oldIndex, index,
+                    [](engine::Module* m, int v) { dynamic_cast<LunarSequencer*>(m)->cvRangeIndex = v; },
+                    complexAction);
                 module->cvRangeIndex = index;
+
+                // Reinterpreting the same normalized knob position under a
+                // new range would silently change the output voltage under
+                // a knob that visually didn't move. Instead, rescale each
+                // step's stored (normalized) value so the actual voltage it
+                // represents is preserved — clamped into the new range —
+                // and let the knob move to show that.
+                float oldMin = LunarSequencer::cvRanges[oldIndex][0];
+                float oldMax = LunarSequencer::cvRanges[oldIndex][1];
+                float newMin = LunarSequencer::cvRanges[index][0];
+                float newMax = LunarSequencer::cvRanges[index][1];
+                for (int i = 0; i < LunarSequencer::NUM_STEPS; i++) {
+                    int paramId = LunarSequencer::STEP_CV_PARAM + i;
+                    float oldNorm = module->params[paramId].getValue();
+                    float volts = clamp(oldMin + oldNorm * (oldMax - oldMin), newMin, newMax);
+                    float newNorm = (volts - newMin) / (newMax - newMin);
+                    if (newNorm != oldNorm) {
+                        history::ParamChange* h = new history::ParamChange;
+                        h->moduleId = module->id;
+                        h->paramId = paramId;
+                        h->oldValue = oldNorm;
+                        h->newValue = newNorm;
+                        complexAction->push(h);
+                        module->params[paramId].setValue(newNorm);
+                    }
+                }
+
+                APP->history->push(complexAction);
             }
         ));
     }
