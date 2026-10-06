@@ -39,8 +39,9 @@
 
 ## Videos
 
+- [free Solar 42 inspired modules and setup in VCV Rack - Omri Cohen](https://www.youtube.com/watch?v=m5tixV10dI8) — a great demo by Omri Cohen
 - [Lunar 42 VCV Rack modules - Cinematic performance](https://youtu.be/Ja0lZwwcWLM) — a live patch using Lunar50Drone, LunarVCO, and LunarLFO; inspired by [JayHosking's original "Solar 42F synth - Cinematic performance"](https://www.youtube.com/watch?v=wQyHPJ56aNg).
-  - Dowload the [VCV-Rack patch file](https://patchstorage.com/vcv-rack-version-of-solar-42f-synth-cinematic-performance/)
+  - Download the [VCV-Rack patch file](https://patchstorage.com/vcv-rack-version-of-solar-42f-synth-cinematic-performance/)
 - [Lunar 42 VCV Rack modules - Cinematic Ambient](https://youtu.be/l4NEwDLc4YI) — a live patch using Lunar50Drone, LunarVCO, LunarLFO, and LunarSequencer; inspired by [JayHosking's original "Cinematic Ambient (part 1)"](https://www.youtube.com/watch?v=45tY-e7fdm4).
 - ["Meditation on Death - Jay Hoskin" - VCV-Rack/Cardinal version](https://youtu.be/0JBJCdcSywY) — a live patch inspired by [JayHosking's original MEDITATIONS ON DEATH | Solar 42F, Vongon Replay, Intellijel Swells & Jellymix, Fieldtone Weaver](https://www.youtube.com/watch?v=jW-JyjP6m4g)
   - Download the [VCV-Rack patch file](https://patchstorage.com/solar42-meditations-on-death-jay-hoskin/)
