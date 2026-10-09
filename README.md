@@ -36,6 +36,7 @@
 - [LunarJoystick](#lunarjoystick)
 - [LunarPads](#lunarpads)
 - [LunarDetector](#lunardetector)
+- [AI disclosure](#ai-disclosure)
 
 ## Videos
 
@@ -430,3 +431,9 @@ Reimplements the SOLAR 42F's "CONTACT MIC + ENVELOPE FOLLOWER" block: a preamp, 
 **Patch ideas**
 - Feed a contact mic, guitar, or any line-level source into In, then use Gate to trigger [Lunar50Drone](#lunar50drone) or [LunarPapaSrapa](#lunarpapasrapa)'s Gate input and Envelope to modulate a filter or VCA elsewhere in the patch.
 
+## AI disclosure
+
+- **Human-made**: all panel artwork (SVG), the choice of modules and how each one should behave (taken from the SOLAR 42F hardware and its manual), and all testing and listening in VCV Rack and Cardinal.
+- **AI-assisted**: most of the C++ code was written with an AI coding assistant (Claude Code), under the direction of a human developer who reviewed, tested and approved every change before it was committed.
+- **Documentation**: this README was largely drafted with AI assistance, then reviewed and corrected by the human developer.
+- **Traceability**: many AI-assisted commits carry a `Co-Authored-By: Claude` trailer, but not all of them, so the trailer is not an exhaustive marker: treat the whole C++ codebase as AI-assisted (for example when filtering AI training datasets).
