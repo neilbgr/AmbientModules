@@ -47,6 +47,7 @@ struct LunarPapaSrapa : Module {
     // ear; backed off to 3.0 (knob position 0.5 lands on depth 0.125,
     // position 1 still gives full depth).
     static constexpr float MOD_CURVE_EXP = 3.0f;
+    static_assert(MOD_CURVE_EXP == 3.0f, "process() hard-codes fmDepth = modAmount^3 as two multiplies");
 
     enum ParamIds {
         RATE_PARAM,         // LFO rate, single knob from 1 Hz up to C4
@@ -113,6 +114,11 @@ struct LunarPapaSrapa : Module {
     // decoupled from shNoiseState above since the two are gated separately.
     uint32_t noiseState = 0x1234567u;
 
+    // RATE_PARAM's pow(pos, RATE_CURVE_EXP) taper, cached while the knob
+    // doesn't move (no CV on this knob) instead of a powf every sample.
+    float cachedRatePos = -1.f;
+    float cachedRateOctaves = 0.f;
+
     LunarPapaSrapa() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
@@ -151,7 +157,12 @@ struct LunarPapaSrapa : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float rateOctaves = RATE_MIN_OCT + (RATE_MAX_OCT - RATE_MIN_OCT) * std::pow(params[RATE_PARAM].getValue(), RATE_CURVE_EXP);
+        float ratePos = params[RATE_PARAM].getValue();
+        if (ratePos != cachedRatePos) {
+            cachedRatePos = ratePos;
+            cachedRateOctaves = RATE_MIN_OCT + (RATE_MAX_OCT - RATE_MIN_OCT) * std::pow(ratePos, RATE_CURVE_EXP);
+        }
+        float rateOctaves = cachedRateOctaves;
 
         bool fm = params[FM_PARAM].getValue() > 0.f;
         bool am = params[AM_PARAM].getValue() > 0.f;
@@ -235,7 +246,9 @@ struct LunarPapaSrapa : Module {
             // front-loaded against the real hardware (see MOD_CURVE_EXP
             // above) — so the curve applies to fmDepth alone, not to
             // modAmount (still used as-is for AM's amGain in PapaSrapaCore).
-            float fmDepth = std::pow(modAmount, MOD_CURVE_EXP);
+            // modAmount^MOD_CURVE_EXP (== 3, see static_assert above) as
+            // plain multiplies rather than a powf per channel per sample.
+            float fmDepth = modAmount * modAmount * modAmount;
             float dividerAmount = clamp(params[DIVIDER_PARAM].getValue() + inputs[DIVIDER_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
             modAmountValues[c] = modAmount;
             fmDepthValues[c] = fmDepth;

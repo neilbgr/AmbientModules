@@ -325,8 +325,8 @@ The real hardware only exposes one CV input (Filter L's frequency only); this mo
 **Knobs**
 - **Filters L/R**
   - **Type L/R** — Low-pass or Band-pass, always independent, even with Link on.    
-  - **Resonance L/R** — always independent, even with Link on. High resonance can self-oscillate; the filter's feedback path is soft-clipped so it settles at a stable, bounded amplitude rather than blowing up.
-  - **Frequency L/R** — filter cutoff, 20Hz to 20kHz. Filter R's Frequency knob is bypassed while Link is on.
+  - **Resonance L/R** — always independent, even with Link on. Like the original Polivoks, the last few percent of the knob's travel (from about 95%) make the filter self-oscillate even with nothing patched in: a sine-like tone at the cutoff frequency, fading in from the onset to about ±5V at full resonance, playable by sweeping Frequency or its CV. Loud, highly resonant signals are gently compressed rather than allowed to ring up to extreme voltages.
+  - **Frequency L/R** — filter cutoff, 20Hz to 20kHz. Filter R's Frequency knob is bypassed while Link is on. The digital filter stops following the knob/CV above a sixth of the sample rate (8kHz at 48kHz), and lower at low Resonance (down to about 0.12× the sample rate, ~5.7kHz at 48kHz, with Resonance at 0) to keep it stable.
   - **Link** — Filter R's effective frequency follows Filter L's (see above) instead of its own Frequency knob.
   - **CV L/R amount** — bipolar attenuverter for CV L/CV R's effect on frequency, independent per side (negative inverts the CV) — see Inputs below for how they combine under Link.
 - **Distortion**
@@ -343,7 +343,7 @@ The real hardware only exposes one CV input (Filter L's frequency only); this mo
 - **CV R** — modulates Filter R's frequency while Link is off, scaled by CV R amount; while Link is on, sums onto Filter L's frequency instead (which Filter R then follows, same as always under Link) — still scaled by its own CV R amount knob either way.
 - **Distortion CV** — modulates the Distortion blend knob, scaled by Distortion blend CV amount, summed onto the knob and clamped to its 0–100% range.
 - **Insert blend CV** — modulates the Insert blend knob, scaled by Insert blend CV amount, summed onto the knob and clamped to its 0–100% range.
-- **In L/R** — stereo audio input.
+- **In L/R** — stereo audio input. A polyphonic cable is summed to mono, same as [LunarMixer](#lunarmixer)'s channel inputs. The CV inputs above only read a cable's first channel.
 - **Return L/R** — the insert loop's return from your external effects chain. Normalled to the dry signal when nothing's patched, so the loop stays transparent until you actually return something. In the *1 poly jack* Send/Return I/O mode (see [Context menu](#lunarfilter-context-menu) below), only Return L is used, carrying a 2-channel poly cable (channel 0 = L, channel 1 = R) — Return R stays visible but is ignored in that mode.
 
 **Outputs**

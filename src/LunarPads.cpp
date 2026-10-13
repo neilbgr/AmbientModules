@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "PanelTheme.hpp"
 #include "Widgets.hpp"
+#include "dsp/Common.hpp"
 
 // Reproduces the "DRONE KEYS" pushbutton grid (manual p.6-7) that triggers
 // the 6 real drone voices (Drone 1/2/4/5 = Lunar50Drone "Classic Solar50",
@@ -53,7 +54,7 @@ struct LunarPads : Module {
 
     void dataFromJson(json_t* rootJ) override {
         if (json_t* j = json_object_get(rootJ, "latchMode")) {
-            latchMode = json_integer_value(j);
+            latchMode = ambient::clampIndex(json_integer_value(j), 2); // 0 = momentary, 1 = latch
         }
     }
 

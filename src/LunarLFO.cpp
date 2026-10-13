@@ -1,11 +1,10 @@
 #include "plugin.hpp"
 #include "dsp/TriSquareLFO.hpp"
 #include "PanelTheme.hpp"
+#include "dsp/Common.hpp"
 
 struct LunarLFO : Module {
-    int cvRangeIndex = 0; // index into cvRanges, default matches hardware (0V to +5V, oscilloscope-verified)
-
-    static constexpr float cvRanges[4][2] = { {0.f, 5.f}, {0.f, 10.f}, {-5.f, 5.f}, {-10.f, 10.f} };
+    int cvRangeIndex = 0; // index into ambient::CV_RANGES, default matches hardware (0V to +5V, oscilloscope-verified)
 
     enum ParamIds {
         WAVE_A_PARAM,
@@ -31,13 +30,8 @@ struct LunarLFO : Module {
     // matches Fundamental's 0.0039..1024 Hz range exactly (2^-8 .. 2^10).
     static constexpr float RATE_MIN_OCT = -8.f;
     static constexpr float RATE_MAX_OCT = 10.f;
-    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
-    // representable in float, and a compile-time literal removes any
-    // dependency on the compiler actually folding a runtime powf call.
-    static constexpr float TWO_POW_30 = 1073741824.f;
-
     static float octavesToHz(float octaves) {
-        return dsp::approxExp2_taylor5(octaves + 30.f) / TWO_POW_30;
+        return ambient::exp2Octaves(octaves);
     }
 
     LunarLFO() {
@@ -60,13 +54,16 @@ struct LunarLFO : Module {
     void dataFromJson(json_t* rootJ) override {
         json_t* cvRangeJ = json_object_get(rootJ, "cvRangeIndex");
         if (cvRangeJ) {
-            cvRangeIndex = json_integer_value(cvRangeJ);
+            // Clamped: indexes CV_RANGES directly in process(), so an
+            // out-of-range value from a corrupt/hand-edited patch would read
+            // past the table.
+            cvRangeIndex = ambient::clampIndex(json_integer_value(cvRangeJ), ambient::NUM_CV_RANGES);
         }
     }
 
     void process(const ProcessArgs& args) override {
-        float rangeMin = cvRanges[cvRangeIndex][0];
-        float rangeMax = cvRanges[cvRangeIndex][1];
+        float rangeMin = ambient::CV_RANGES[cvRangeIndex][0];
+        float rangeMax = ambient::CV_RANGES[cvRangeIndex][1];
 
         if (outputs[LFO_A_OUTPUT].isConnected()) {
             float freqA = octavesToHz(params[RATE_A_PARAM].getValue());
@@ -85,8 +82,6 @@ struct LunarLFO : Module {
         }
     }
 };
-
-constexpr float LunarLFO::cvRanges[4][2];
 
 struct LunarLFOWidget : ModuleWidget {
     int appliedTheme = -1;

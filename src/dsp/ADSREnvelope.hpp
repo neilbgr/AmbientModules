@@ -1,5 +1,6 @@
 #pragma once
 #include <rack.hpp>
+#include "Common.hpp"
 
 using namespace rack;
 
@@ -14,17 +15,12 @@ using namespace rack;
 // ever sees one combined gate signal. Pure DSP, no Module/param/light
 // dependency.
 struct ADSREnvelope {
-    static constexpr float MIN_TIME = 0.001f;
-    static constexpr float MAX_TIME = 15.f;
-    static constexpr float LOG2_RATIO = 13.872675f; // log2(MAX_TIME / MIN_TIME)
+    static constexpr float MIN_TIME = ambient::ENV_MIN_TIME;
+    static constexpr float MAX_TIME = ambient::ENV_MAX_TIME;
     // Overshoot the real target so the exponential curve actually crosses it
     // in bounded time, instead of approaching it forever (same trick as
     // Fundamental's ADSR, which uses 1.01f for its attack target).
     static constexpr float TARGET_OVERSHOOT = 0.01f;
-    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
-    // representable in float, and a compile-time literal removes any
-    // dependency on the compiler actually folding a runtime powf call.
-    static constexpr float TWO_POW_30 = 1073741824.f;
 
     enum Stage { STAGE_IDLE, STAGE_ATTACK, STAGE_DECAY, STAGE_SUSTAIN, STAGE_RELEASE };
 
@@ -36,9 +32,9 @@ struct ADSREnvelope {
     // non-poly (same for every channel), so callers should compute the 3
     // lambdas once per process() call and pass them to process() below
     // rather than recomputing per channel.
+    // Same 1ms..15s taper as AREnvelope, see dsp/Common.hpp.
     static float lambdaFromKnob(float knobValue) {
-        float time = MIN_TIME * dsp::approxExp2_taylor5(LOG2_RATIO * knobValue + 30.f) / TWO_POW_30;
-        return 1.f / time;
+        return ambient::envLambdaFromKnob(knobValue);
     }
 
     // Returns the envelope value in [0, 1].
@@ -63,7 +59,11 @@ struct ADSREnvelope {
         switch (stage) {
             case STAGE_ATTACK:  target = 1.f + TARGET_OVERSHOOT; lambda = attackLambda;  break;
             case STAGE_DECAY:   target = sustainLevel;            lambda = decayLambda;   break;
-            case STAGE_SUSTAIN: target = sustainLevel;            lambda = 0.f;            break;
+            // Sustain keeps tracking the knob at the decay rate (was lambda
+            // 0, which made the snap below jump straight to the new level):
+            // moving Sustain while held now glides there instead of
+            // stepping (an audible click on the enveloped VCA output).
+            case STAGE_SUSTAIN: target = sustainLevel;            lambda = decayLambda;   break;
             case STAGE_RELEASE: target = -TARGET_OVERSHOOT;       lambda = releaseLambda; break;
             default: break;
         }

@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "PanelTheme.hpp"
 #include "Widgets.hpp"
+#include "dsp/Common.hpp"
 
 // Electrical equivalent of the SOLAR 42F Joystick block (manual p.10) without
 // the physical stick: X and Y are each either a manual knob (-5V..+5V, used
@@ -36,13 +37,10 @@ struct LunarJoystick : Module {
     float smoothCoef = 0.f;
 
     void onSampleRateChange(const SampleRateChangeEvent& e) override {
-        // exp2_taylor5 (already used by ADSREnvelope::lambdaFromKnob) instead
-        // of std::exp: base-2 Taylor/Horner approximation (<=6e-6 relative
-        // error) instead of libm's exp(), which spends cycles on range
-        // reduction/edge cases this bounded, always-negative argument never
-        // hits. exp(z) == 2^(z * log2(e)).
-        constexpr float LOG2E = 1.4426950408889634f;
-        smoothCoef = 1.f - dsp::exp2_taylor5(-e.sampleTime / SMOOTH_TAU * LOG2E);
+        // Same shared helper as PapaSrapaCore's fixed-tau coefficients
+        // (dsp/Common.hpp). Plain std::exp: this only runs on a sample rate
+        // change, so its cost is irrelevant.
+        smoothCoef = ambient::onePoleCoef(e.sampleTime, SMOOTH_TAU);
     }
 
     enum ParamIds {

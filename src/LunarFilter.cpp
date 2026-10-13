@@ -3,6 +3,7 @@
 #include "Widgets.hpp"
 #include "FilterExpanderMessage.hpp"
 #include "dsp/PolivoksFilter.hpp"
+#include "dsp/Common.hpp"
 
 // Reimplements the SOLAR 42F's "FILTER" block (manual p.21): two
 // independent 12dB Polivoks-style multimode (LP/BP) filters, meant to be
@@ -144,7 +145,7 @@ struct LunarFilter : Module {
 
     void dataFromJson(json_t* rootJ) override {
         if (json_t* ioModeJ = json_object_get(rootJ, "ioMode")) {
-            ioMode = json_integer_value(ioModeJ);
+            ioMode = ambient::clampIndex(json_integer_value(ioModeJ), IO_POLY_BUS + 1);
         }
     }
 
@@ -163,14 +164,16 @@ struct LunarFilter : Module {
         // frequency instead, which Filter R then follows (below).
         float modOctL = modOctFromL + (link ? modOctFromR : 0.f);
         float effFreqLOct = FREQ_LOG2_RATIO * params[FREQ_L_PARAM].getValue() + modOctL;
-        float freqLHz = FREQ_MIN_HZ * std::pow(2.f, effFreqLOct);
+        // ambient::exp2Octaves (<=6e-6 relative error, <0.01 cent) instead
+        // of std::pow: two of these run every sample.
+        float freqLHz = FREQ_MIN_HZ * ambient::exp2Octaves(effFreqLOct);
 
         float freqRHz;
         if (link) {
             freqRHz = freqLHz;
         } else {
             float effFreqROct = FREQ_LOG2_RATIO * params[FREQ_R_PARAM].getValue() + modOctFromR;
-            freqRHz = FREQ_MIN_HZ * std::pow(2.f, effFreqROct);
+            freqRHz = FREQ_MIN_HZ * ambient::exp2Octaves(effFreqROct);
         }
 
         PolivoksFilter::Mode typeL = (params[TYPE_L_PARAM].getValue() > 0.5f) ? PolivoksFilter::MODE_BP : PolivoksFilter::MODE_LP;
@@ -179,8 +182,13 @@ struct LunarFilter : Module {
         // /5.f: normalize the +-5V Eurorack audio convention to the ~+-1
         // domain PolivoksFilter/fastTanh work in, same convention as
         // LunarVCOCore's dry output before its own x5V output stage.
-        float inL = inputs[IN_L_INPUT].getVoltage() / 5.f;
-        float inR = inputs[IN_R_INPUT].getVoltage() / 5.f;
+        // getVoltageSum(), not getVoltage(): a polyphonic cable (e.g. a poly
+        // VCO patched straight in) is summed to mono like LunarMixer's
+        // channel inputs, instead of silently keeping only its channel 1.
+        // The CV inputs stay channel-1-only: summing several modulation
+        // voltages has no meaningful "cutoff" interpretation.
+        float inL = inputs[IN_L_INPUT].getVoltageSum() / 5.f;
+        float inR = inputs[IN_R_INPUT].getVoltageSum() / 5.f;
 
         float filteredL = filterL.process(args.sampleRate, inL, freqLHz, params[RES_L_PARAM].getValue(), typeL);
         float filteredR = filterR.process(args.sampleRate, inR, freqRHz, params[RES_R_PARAM].getValue(), typeR);
@@ -189,8 +197,8 @@ struct LunarFilter : Module {
         float distCv = inputs[DIST_CV_INPUT].getVoltage() / 10.f;
         float distAmt = clamp(params[DIST_PARAM].getValue() + distCv * params[DIST_MOD_PARAM].getValue(), 0.f, 1.f);
         float driveScale = 1.f + params[GAIN_PARAM].getValue() * MAX_DRIVE;
-        float wetL = PolivoksFilter::fastTanh(filteredL * driveScale);
-        float wetR = PolivoksFilter::fastTanh(filteredR * driveScale);
+        float wetL = ambient::fastTanh(filteredL * driveScale);
+        float wetR = ambient::fastTanh(filteredR * driveScale);
 
         // Today's filtered+distorted signal becomes the pre-insert ("dry")
         // signal: what's sent to the external FX loop, and what a bypassed

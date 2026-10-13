@@ -1,6 +1,7 @@
 #pragma once
 #include <rack.hpp>
 #include "PolyBlep.hpp"
+#include "Common.hpp"
 
 using namespace rack;
 
@@ -28,10 +29,6 @@ struct LunarVCOCore {
     };
 
     static constexpr float SINE_SAW_PHASE_OFFSET = 0.33333f; // a third of a period; tuned by ear against hardware
-    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
-    // representable in float, and a compile-time literal removes any
-    // dependency on the compiler actually folding a runtime powf call.
-    static constexpr float TWO_POW_30 = 1073741824.f;
     // Named constant instead of `2.f * M_PI` — M_PI is a double, and mixing
     // it directly with simd::float_4 arithmetic below would rely on an
     // implicit double->float->float_4 conversion; spelling it out as a
@@ -59,15 +56,6 @@ struct LunarVCOCore {
         return state;
     }
 
-    // Cheap Pade(3,2) rational approximation of tanh (no simd::tanh in the
-    // Rack SDK, and real std::tanh would mean 4 scalar calls + repacking per
-    // SIMD group, per sample) — unity gain near 0 so normal-amplitude signal
-    // passes through unchanged, smoothly saturating toward +-1 beyond that.
-    static simd::float_4 fastTanh(simd::float_4 x) {
-        x = simd::clamp(x, -3.f, 3.f);
-        return x * (27.f + x * x) / (27.f + 9.f * x * x);
-    }
-
     simd::float_4 phase = 0.f;
     simd::float_4 subPhase = 0.f;
     simd::float_4 cornerSmooth = 0.f;
@@ -87,7 +75,7 @@ struct LunarVCOCore {
                            bool octaveOn, bool subOscOn, simd::float_4 syncInput) {
 
         simd::float_4 subFreq = 0.f;
-        simd::float_4 freq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitchOctaves + expFmOctaves + 30.f) / TWO_POW_30;
+        simd::float_4 freq = dsp::FREQ_C4 * ambient::exp2Octaves(pitchOctaves + expFmOctaves);
         freq += linFmHz;
         if (subOscOn) {
             subFreq = freq * 0.5f; // one octave below
@@ -184,6 +172,8 @@ struct LunarVCOCore {
         // PolyBLEP correction near Square/Inv Saw edges (and the sub-osc sum
         // above) can transiently push out past +-1 — soft-clip rather than
         // let those spikes hit the module's x5V output stage undamped.
-        return fastTanh(out);
+        // ambient::fastTanh: Pade(3,2), see dsp/Common.hpp (no simd::tanh in
+        // the Rack SDK).
+        return ambient::fastTanh(out);
     }
 };

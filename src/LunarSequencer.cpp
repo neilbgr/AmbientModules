@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "PanelTheme.hpp"
+#include "dsp/Common.hpp"
 
 struct LunarSequencer;
 
@@ -75,7 +76,7 @@ using ClickTargetCKSSThreeHorizontal = ClickTargetSwitch<CKSSThreeHorizontal>;
 struct LunarSequencer : Module {
     static const int NUM_STEPS = 5;
 
-    int cvRangeIndex = 0; // index into cvRanges
+    int cvRangeIndex = 0; // index into ambient::CV_RANGES
 
     enum ParamIds {
         ENUMS(STEP_CV_PARAM, NUM_STEPS),     // 0..1 normalized, rescaled by cvRangeIndex at output time
@@ -103,16 +104,9 @@ struct LunarSequencer : Module {
 
     static constexpr float RATE_MIN_OCT = -4.3219f; // 0.05 Hz (20 s/step)
     static constexpr float RATE_MAX_OCT = 6.f;
-    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
-    // representable in float, and a compile-time literal removes any
-    // dependency on the compiler actually folding a runtime powf call.
-    static constexpr float TWO_POW_30 = 1073741824.f;
-
     static float octavesToHz(float octaves) {
-        return dsp::approxExp2_taylor5(octaves + 30.f) / TWO_POW_30;
+        return ambient::exp2Octaves(octaves);
     }
-
-    static constexpr float cvRanges[4][2] = { {0.f, 5.f}, {0.f, 10.f}, {-5.f, 5.f}, {-10.f, 10.f} };
 
     dsp::SchmittTrigger clockTrigger;
     dsp::SchmittTrigger resetTrigger;
@@ -149,7 +143,10 @@ struct LunarSequencer : Module {
     void dataFromJson(json_t* rootJ) override {
         json_t* cvRangeJ = json_object_get(rootJ, "cvRangeIndex");
         if (cvRangeJ) {
-            cvRangeIndex = json_integer_value(cvRangeJ);
+            // Clamped: indexes CV_RANGES directly in process(), so an
+            // out-of-range value from a corrupt/hand-edited patch would read
+            // past the table.
+            cvRangeIndex = ambient::clampIndex(json_integer_value(cvRangeJ), ambient::NUM_CV_RANGES);
         }
     }
 
@@ -195,8 +192,8 @@ struct LunarSequencer : Module {
         outputs[CLOCK_OUTPUT].setVoltage(effectiveClockVoltage);
 
         // According to the documentaiton : "Gates switches does not affect the CV voltage output."
-        float rangeMin = cvRanges[cvRangeIndex][0];
-        float rangeMax = cvRanges[cvRangeIndex][1];
+        float rangeMin = ambient::CV_RANGES[cvRangeIndex][0];
+        float rangeMax = ambient::CV_RANGES[cvRangeIndex][1];
         float cvNorm = params[STEP_CV_PARAM + stepIndex].getValue();
         outputs[CV_OUTPUT].setVoltage(rangeMin + cvNorm * (rangeMax - rangeMin));
 
@@ -216,19 +213,17 @@ struct LunarSequencer : Module {
     }
 };
 
-constexpr float LunarSequencer::cvRanges[4][2];
-
 float StepCvQuantity::getDisplayValue() {
     LunarSequencer* m = dynamic_cast<LunarSequencer*>(module);
-    float rangeMin = LunarSequencer::cvRanges[m->cvRangeIndex][0];
-    float rangeMax = LunarSequencer::cvRanges[m->cvRangeIndex][1];
+    float rangeMin = ambient::CV_RANGES[m->cvRangeIndex][0];
+    float rangeMax = ambient::CV_RANGES[m->cvRangeIndex][1];
     return rangeMin + getValue() * (rangeMax - rangeMin);
 }
 
 void StepCvQuantity::setDisplayValue(float displayValue) {
     LunarSequencer* m = dynamic_cast<LunarSequencer*>(module);
-    float rangeMin = LunarSequencer::cvRanges[m->cvRangeIndex][0];
-    float rangeMax = LunarSequencer::cvRanges[m->cvRangeIndex][1];
+    float rangeMin = ambient::CV_RANGES[m->cvRangeIndex][0];
+    float rangeMax = ambient::CV_RANGES[m->cvRangeIndex][1];
     setValue((displayValue - rangeMin) / (rangeMax - rangeMin));
 }
 
@@ -306,10 +301,10 @@ struct LunarSequencerWidget : ModuleWidget {
                 // step's stored (normalized) value so the actual voltage it
                 // represents is preserved — clamped into the new range —
                 // and let the knob move to show that.
-                float oldMin = LunarSequencer::cvRanges[oldIndex][0];
-                float oldMax = LunarSequencer::cvRanges[oldIndex][1];
-                float newMin = LunarSequencer::cvRanges[index][0];
-                float newMax = LunarSequencer::cvRanges[index][1];
+                float oldMin = ambient::CV_RANGES[oldIndex][0];
+                float oldMax = ambient::CV_RANGES[oldIndex][1];
+                float newMin = ambient::CV_RANGES[index][0];
+                float newMax = ambient::CV_RANGES[index][1];
                 for (int i = 0; i < LunarSequencer::NUM_STEPS; i++) {
                     int paramId = LunarSequencer::STEP_CV_PARAM + i;
                     float oldNorm = module->params[paramId].getValue();

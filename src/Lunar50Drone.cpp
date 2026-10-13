@@ -1,13 +1,14 @@
 #include "plugin.hpp"
 #include "dsp/AREnvelope.hpp"
 #include "dsp/DroneVoice.hpp"
+#include "dsp/Common.hpp"
 #include "PanelTheme.hpp"
 
 struct Lunar50Drone : Module {
     static const int NUM_OSC = DroneVoice::NUM_OSC;
     static constexpr float OUTPUT_VOLTAGE = 5.f; // Eurorack ±5V audio convention
 
-    enum MixMode { MIX_FIXED = 0, MIX_AVERAGE_ACTIVE = 1, MIX_SOFT_CLIP = 2, MIX_MAX2 = 3, MIX_MAX3 = 4, MIX_MAX4 = 5 };
+    enum MixMode { MIX_FIXED = 0, MIX_AVERAGE_ACTIVE = 1, MIX_SOFT_CLIP = 2, MIX_MAX2 = 3, MIX_MAX3 = 4, MIX_MAX4 = 5, NUM_MIX_MODES };
     int mixMode = 0; // 0 = Fixed /5 (legacy), keeps existing patches sounding the same
 
     enum ParamIds {
@@ -80,12 +81,14 @@ struct Lunar50Drone : Module {
     void dataFromJson(json_t* rootJ) override {
         json_t* fmTopologyJ = json_object_get(rootJ, "fmTopology");
         if (fmTopologyJ) {
-            int fmTopology = json_integer_value(fmTopologyJ);
+            // Clamped like every other saved menu index: a corrupt or
+            // hand-edited patch can't select a mode that doesn't exist.
+            int fmTopology = ambient::clampIndex(json_integer_value(fmTopologyJ), 2); // 0 = average, 1 = circular chain
             for (int c = 0; c < PORT_MAX_CHANNELS; c++) voice[c].fmTopology = fmTopology;
         }
         json_t* mixModeJ = json_object_get(rootJ, "mixMode");
         if (mixModeJ) {
-            mixMode = json_integer_value(mixModeJ);
+            mixMode = ambient::clampIndex(json_integer_value(mixModeJ), NUM_MIX_MODES);
         }
     }
 
@@ -171,7 +174,12 @@ struct Lunar50Drone : Module {
                         sawOut = OUTPUT_VOLTAGE * mix / std::max(activeCount, 1) * envAmount;
                         break;
                     case MIX_SOFT_CLIP:
-                        sawOut = OUTPUT_VOLTAGE * std::tanh(mix) * envAmount;
+                        // accurateTanh, not the pack's Pade fastTanh: same
+                        // curve as the std::tanh this replaced to within
+                        // 1e-4 over the whole +-5 mix range (fastTanh is off
+                        // by up to 0.024, i.e. a different saturation shape),
+                        // at a fraction of libm's cost per channel per sample.
+                        sawOut = OUTPUT_VOLTAGE * ambient::accurateTanh(mix) * envAmount;
                         break;
                     case MIX_MAX2:
                         sawOut = OUTPUT_VOLTAGE * mix / 2.f * envAmount;

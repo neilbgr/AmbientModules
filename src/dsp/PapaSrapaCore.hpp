@@ -1,5 +1,6 @@
 #pragma once
 #include <rack.hpp>
+#include "Common.hpp"
 
 using namespace rack;
 
@@ -76,14 +77,28 @@ namespace PapaSrapaRamp {
     static inline float rampClamp(float x, float a, float b) { return clamp(x, a, b); }
     static inline simd::float_4 rampClamp(simd::float_4 x, simd::float_4 a, simd::float_4 b) { return simd::clamp(x, a, b); }
 
+    // The only two freq-dependent coefficients of shape() below (one exp()
+    // each), split out so a caller whose freq is often constant (the scalar
+    // modulator: knob-driven rate) can cache them, while the SIMD audio path
+    // (freq moves under FM) simply recomputes them every sample.
+    template <typename T>
+    inline T dutyThresholdFor(T freq) {
+        return 0.5f + DUTY_ASYM_DEPTH * rampExp(freq * DUTY_ASYM_NEG_INV_F0);
+    }
+    template <typename T>
+    inline T slowCoefFor(T freq, float sampleTime) {
+        T period = 1.f / rampMax(freq, T(1e-6f));
+        T slowTau = SLOW_TAU_PERIODS * period;
+        return 1.f - rampExp(-sampleTime / slowTau);
+    }
+
     // fastCoef/smoothCoef are 1-exp(-sampleTime/TAU) for the two FIXED taus
     // above — precomputed by the caller since they only depend on
-    // sampleTime, not freq. Only the slowTau term below genuinely varies per
-    // call (it tracks freq, which moves under FM).
+    // sampleTime, not freq. dutyThreshold/slowCoef come from the two helpers
+    // above for this same freq.
     template <typename T>
     inline T shape(T& fast, T& slow, T& smooth, T phase, T freq,
-                    float sampleTime, float fastCoef, float smoothCoef) {
-        T dutyThreshold = 0.5f + DUTY_ASYM_DEPTH * rampExp(freq * DUTY_ASYM_NEG_INV_F0);
+                    T dutyThreshold, T slowCoef, float fastCoef, float smoothCoef) {
         // An asymmetric duty cycle needs asymmetric target LEVELS too, not just
         // an asymmetric time split -- spending most of the period near +1 and
         // only a brief moment near -1 would drag the average output well above
@@ -98,9 +113,7 @@ namespace PapaSrapaRamp {
         T target = simd::ifelse(phase < dutyThreshold, highTarget, lowTarget);
         fast += (target - fast) * fastCoef;
 
-        T period = 1.f / rampMax(freq, T(1e-6f));
-        T slowTau = SLOW_TAU_PERIODS * period;
-        slow += (target - slow) * (1.f - rampExp(-sampleTime / slowTau));
+        slow += (target - slow) * slowCoef;
 
         T blended = rampClamp((MIX * fast + (1.f - MIX) * slow) * MAKEUP_GAIN, T(-1.f), T(1.f));
         smooth += (blended - smooth) * smoothCoef;
@@ -118,11 +131,6 @@ namespace PapaSrapaRamp {
 // that a plain per-channel loop is not worth vectorizing (see
 // LunarPapaSrapa.cpp's design notes).
 struct PapaSrapaModulator {
-    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
-    // representable in float, and a compile-time literal removes any
-    // dependency on the compiler actually folding a runtime powf call.
-    static constexpr float TWO_POW_30 = 1073741824.f;
-
     float phase = 0.f;
     float fast = 0.f, slow = 0.f, smooth = 0.f;
     float lfoOut = 0.f; // last square sample in [-1, 1], tapped by LFO_OUTPUT
@@ -130,25 +138,39 @@ struct PapaSrapaModulator {
     float cachedSampleTime = -1.f;
     float fastCoef = 0.f;
     float smoothCoef = 0.f;
+    // shape()'s freq-dependent coefficients, cached while modFreq (rate knob
+    // and this channel's Divider) and sampleTime stay the same — the usual
+    // case, saving 2 std::exp per channel per sample. Exact: same inputs,
+    // same values.
+    float cachedFreq = -1.f;
+    float dutyThreshold = 0.5f;
+    float slowCoef = 0.f;
 
     // rateOctaves: modulator frequency (octaves rel. 1 Hz, same convention as
     // LunarLFO::octavesToHz). dividerAmount: 0..1, divides the frequency
     // down (1..8) before it reaches the FM/AM stage — richer, slower beating
     // at higher settings. Returns the modulator square sample in [-1, 1].
     float process(float sampleTime, float rateOctaves, float dividerAmount) {
-        if (sampleTime != cachedSampleTime) {
+        bool sampleTimeChanged = (sampleTime != cachedSampleTime);
+        if (sampleTimeChanged) {
             cachedSampleTime = sampleTime;
-            fastCoef = 1.f - std::exp(-sampleTime / PapaSrapaRamp::FAST_TAU);
-            smoothCoef = 1.f - std::exp(-sampleTime / PapaSrapaRamp::SMOOTH_TAU);
+            fastCoef = ambient::onePoleCoef(sampleTime, PapaSrapaRamp::FAST_TAU);
+            smoothCoef = ambient::onePoleCoef(sampleTime, PapaSrapaRamp::SMOOTH_TAU);
         }
 
-        float modFreq = dsp::approxExp2_taylor5(rateOctaves + 30.f) / TWO_POW_30;
+        float modFreq = ambient::exp2Octaves(rateOctaves);
         float divider = 1.f + dividerAmount * 7.f; // 1..8
         modFreq /= divider;
 
+        if (sampleTimeChanged || modFreq != cachedFreq) {
+            cachedFreq = modFreq;
+            dutyThreshold = PapaSrapaRamp::dutyThresholdFor(modFreq);
+            slowCoef = PapaSrapaRamp::slowCoefFor(modFreq, sampleTime);
+        }
+
         phase += modFreq * sampleTime;
         phase -= std::floor(phase);
-        lfoOut = PapaSrapaRamp::shape(fast, slow, smooth, phase, modFreq, sampleTime, fastCoef, smoothCoef);
+        lfoOut = PapaSrapaRamp::shape(fast, slow, smooth, phase, modFreq, dutyThreshold, slowCoef, fastCoef, smoothCoef);
         return lfoOut;
     }
 };
@@ -176,11 +198,6 @@ struct PapaSrapaModulator {
 // below) in place of std::exp, inside PapaSrapaRamp::shape's slowTau term.
 struct PapaSrapaCore {
     enum ModMode { MODE_OFF, MODE_FM, MODE_AM, MODE_FM_AM };
-
-    // Named constant instead of std::pow(2.f, 30.f) — 2^30 is exactly
-    // representable in float, and a compile-time literal removes any
-    // dependency on the compiler actually folding a runtime powf call.
-    static constexpr float TWO_POW_30 = 1073741824.f;
 
     simd::float_4 audioPhase = 0.f;
     simd::float_4 audioFast = 0.f, audioSlow = 0.f, audioSmooth = 0.f;
@@ -230,20 +247,21 @@ struct PapaSrapaCore {
 
         if (sampleTime != cachedSampleTime) {
             cachedSampleTime = sampleTime;
-            fastCoef = 1.f - std::exp(-sampleTime / PapaSrapaRamp::FAST_TAU);
-            smoothCoef = 1.f - std::exp(-sampleTime / PapaSrapaRamp::SMOOTH_TAU);
+            fastCoef = ambient::onePoleCoef(sampleTime, PapaSrapaRamp::FAST_TAU);
+            smoothCoef = ambient::onePoleCoef(sampleTime, PapaSrapaRamp::SMOOTH_TAU);
         }
 
         bool fmOn = (modMode == MODE_FM || modMode == MODE_FM_AM);
         bool amOn = (modMode == MODE_AM || modMode == MODE_FM_AM);
 
         simd::float_4 fmOctaves = fmOn ? modSquare * fmDepth * 2.f : simd::float_4::zero(); // up to +-2 octaves
-        simd::float_4 audioFreq = dsp::FREQ_C4 * dsp::approxExp2_taylor5(pitchOctaves + fmOctaves + 30.f) / TWO_POW_30;
+        simd::float_4 audioFreq = dsp::FREQ_C4 * ambient::exp2Octaves(pitchOctaves + fmOctaves);
         audioFreq = simd::clamp(audioFreq, 0.f, sampleRate / 2.f);
 
         audioPhase += audioFreq * sampleTime;
         audioPhase -= simd::floor(audioPhase);
-        simd::float_4 audioSquare = PapaSrapaRamp::shape(audioFast, audioSlow, audioSmooth, audioPhase, audioFreq, sampleTime, fastCoef, smoothCoef);
+        simd::float_4 audioSquare = PapaSrapaRamp::shape(audioFast, audioSlow, audioSmooth, audioPhase, audioFreq,
+            PapaSrapaRamp::dutyThresholdFor(audioFreq), PapaSrapaRamp::slowCoefFor(audioFreq, sampleTime), fastCoef, smoothCoef);
 
         // At modDepth == 0 this must reduce to unity gain (AM effectively
         // off, passthrough level) — interpolate from unity (depth 0) down to

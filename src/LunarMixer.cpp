@@ -3,6 +3,7 @@
 #include "Widgets.hpp"
 #include "FilterExpanderMessage.hpp"
 #include "dsp/EnvelopeFollower.hpp"
+#include "dsp/Common.hpp"
 
 // 9-voice panoramic mixer (SOLAR 42F manual p.21: Drone1, Drone2, Drone3,
 // Ext.Audio, VCO A, VCO B, Preamp, Drone4, Drone5, Drone6 — 10 physical jacks
@@ -114,7 +115,7 @@ struct LunarMixer : Module {
 
     void dataFromJson(json_t* rootJ) override {
         if (json_t* j = json_object_get(rootJ, "preferMixerOutput")) {
-            preferMixerOutput = json_integer_value(j);
+            preferMixerOutput = ambient::clampIndex(json_integer_value(j), 2); // 0 = filter, 1 = mixer
         }
     }
 
