@@ -42,16 +42,18 @@
 
 - [free Solar 42 inspired modules and setup in VCV Rack - Omri Cohen](https://www.youtube.com/watch?v=m5tixV10dI8) — a great demo by Omri Cohen
 - [Lunar 42 VCV Rack modules - Cinematic performance](https://youtu.be/Ja0lZwwcWLM) — a live patch using Lunar50Drone, LunarVCO, and LunarLFO; inspired by [JayHosking's original "Solar 42F synth - Cinematic performance"](https://www.youtube.com/watch?v=wQyHPJ56aNg).
-  - Download the [VCV-Rack patch file](https://patchstorage.com/vcv-rack-version-of-solar-42f-synth-cinematic-performance/)
+  - Download the [VCV-Rack patch file](patches/Solar42f-Cinematic-Performance.vcv), or [view its diagram in VCV Patch Tools](https://neilbgr.github.io/VcvPatchTools/?url=https://github.com/neilbgr/AmbientModules/blob/main/patches/Solar42f-Cinematic-Performance.vcv)
 - [Lunar 42 VCV Rack modules - Cinematic Ambient](https://youtu.be/l4NEwDLc4YI) — a live patch using Lunar50Drone, LunarVCO, LunarLFO, and LunarSequencer; inspired by [JayHosking's original "Cinematic Ambient (part 1)"](https://www.youtube.com/watch?v=45tY-e7fdm4).
 - ["Meditation on Death - Jay Hoskin" - VCV-Rack/Cardinal version](https://youtu.be/0JBJCdcSywY) — a live patch inspired by [JayHosking's original MEDITATIONS ON DEATH | Solar 42F, Vongon Replay, Intellijel Swells & Jellymix, Fieldtone Weaver](https://www.youtube.com/watch?v=jW-JyjP6m4g)
-  - Download the [VCV-Rack patch file](https://patchstorage.com/solar42-meditations-on-death-jay-hoskin/)
+  - Download the [VCV-Rack patch file](patches/Meditations-on-Death.vcv), or [view its diagram in VCV Patch Tools](https://neilbgr.github.io/VcvPatchTools/?url=https://github.com/neilbgr/AmbientModules/blob/main/patches/Meditations-on-Death.vcv)
 
 ## Solar 42f patch
 
 ![Solar42-patch.vcv](docs/images/Solar42-Patch.png)
 
 [**Solar42-patch.vcv**](patches/Solar42-patch.vcv) — a full-rack patch reassembling the SOLAR 42F's own architecture out of these modules: 4× Lunar50Drone (Drone 1/2/4/5, Oscillator mix set to *Fixed sum / 5 (legacy)* to match the real hardware's mixing) and 2× LunarPapaSrapa (Drone 3/6) gated from LunarPads, 2× LunarVCO (VCO A/B, cross-modulating each other's FM and both driven from the same MIDI keyboard), all summed through LunarMixer and into LunarFilter (Filter L's cutoff modulated by a LunarLFO, Filter R's by a MIDI CC) before audio output, plus LunarSequencer/LunarLFO/LunarJoystick for modulation and an unpatched LunarDetector included alongside for reference. Uses Rack's own core MIDI-CV/Audio modules (not Cardinal-specific ones), so it opens equally well in standalone VCV Rack or in Cardinal (drag the file onto the window, or File → Open) — a patch saved from Cardinal using its own Host MIDI/Audio modules would only open back in Cardinal, not standalone Rack.
+
+[View the patch's diagram in VCV Patch Tools](https://neilbgr.github.io/VcvPatchTools/?url=https://github.com/neilbgr/AmbientModules/blob/main/patches/Solar42-patch.vcv), a web app that draws what a VCV Rack or Cardinal patch does, right in the browser.
 
 ## Panel themes
 
