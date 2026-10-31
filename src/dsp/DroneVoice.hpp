@@ -1,6 +1,7 @@
 #pragma once
 #include <rack.hpp>
 #include "Common.hpp"
+#include "PolyBlep.hpp"
 
 using namespace rack;
 
@@ -82,11 +83,20 @@ struct DroneVoice {
             phase[i] += deltaPhase;
             phase[i] -= std::trunc(phase[i]);
 
-            float sawValue = 2.f * (phase[i] - std::round(phase[i])); // sawtooth naïf, pas d'anti-aliasing
+            float sawValue = 2.f * (phase[i] - std::round(phase[i]));
+            // The cross-FM source stays the naive saw: it only drives pitch,
+            // never reaches the output directly, so keeping it unchanged
+            // leaves the VOLT FM character exactly as tuned.
             newPrevSaw[i] = sawValue;
 
             if (active[i]) {
-                mix += sawValue;
+                // This saw's single hard edge (+1 -> -1) sits at phase == 0.5
+                // (std::round flips there), not at the wrap — PolyBLEP-correct
+                // it (band-limiting, see PolyBlep.hpp) so pitch sweeps don't
+                // alias. Subtracted: it's a downward jump of 2.
+                float edgeDistance = phase[i] + 0.5f;
+                edgeDistance -= std::trunc(edgeDistance);
+                mix += sawValue - polyBlep(edgeDistance, deltaPhase);
             }
         }
         for (int i = 0; i < NUM_OSC; i++) {

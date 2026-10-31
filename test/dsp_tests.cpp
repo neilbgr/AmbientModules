@@ -391,7 +391,7 @@ static void testPapaSrapaModulatorCache() {
         float freq = ambient::exp2Octaves(rate) / (1.f + divider * 7.f);
         phase += freq * st;
         phase -= std::floor(phase);
-        float b = PapaSrapaRamp::shape(fast, slow, smooth, phase, freq,
+        float b = PapaSrapaRamp::shape(fast, slow, smooth, phase, freq, freq * st,
             PapaSrapaRamp::dutyThresholdFor(freq), PapaSrapaRamp::slowCoefFor(freq, st), fastCoef, smoothCoef);
         if (a != b) {
             diff++;

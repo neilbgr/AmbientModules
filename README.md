@@ -97,6 +97,7 @@ A few behaviors repeat across several modules and are only explained here:
 
 - **V/OCT.** Pitch inputs follow the standard 1 volt per octave convention (0V = C4), like any other Rack oscillator.
 - **Polyphony.** Lunar50Drone, LunarVCO, and LunarPapaSrapa are polyphonic: every CV input on their main panel (not just V/OCT/Gate — also Volt CV on Lunar50Drone, FM/Shape CV/Sync on LunarVCO, Modulation depth CV/Divider CV on LunarPapaSrapa) is read independently per channel, and the module's channel count follows whichever of them carries the most channels, or the Envelope CV input if that's higher still. So patching a polyphonic V/OCT or Gate signal (from a polyphonic sequencer, MIDI-to-CV, etc.) anywhere among those inputs, or chaining another module's polyphonic Envelope output into Envelope CV, drives independent voices per channel throughout the module.
+- **Band-limited oscillators.** Lunar50Drone, LunarVCO, and LunarPapaSrapa correct every hard edge and corner of their waveforms (PolyBLEP/BLAMP), including LunarVCO's morphing shapes and hard sync, to keep digital aliasing low at a negligible CPU cost. Very deep audio-rate FM can still alias a little on the brighter waveforms.
 - **Envelope CV override.** Lunar50Drone, LunarVCO, and LunarPapaSrapa each have an **Envelope CV** input. When it's patched, it completely replaces that module's internal envelope, its Gate input, and its Hold switch — handy for driving several of these modules from one shared envelope so their amplitudes stay locked together.
 - **Hold.** Also shared by those same three modules: a **Hold** switch that, when engaged, forces the envelope open permanently (an "always on" drone) — same effect as holding the Gate input high, and the same switch is overridden the moment the Envelope CV input is patched.
 
@@ -157,7 +158,7 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 - **Shape** — pulse width (square) or morph blend (the two morphing waveforms), plus its CV amount attenuverter.
 - **Tune** — ±0.5 octave fine tune.
 - **Octave** (lit button) — Low or +3 octaves.
-- **FM mode** (lit button) — Linear or Exponential FM response for the FM input.
+- **FM mode** (lit button) — Linear or Exponential FM response for the FM input. Linear FM is through-zero: deep modulation that pulls the frequency below 0 Hz runs the oscillator backwards instead of stalling it, so the pitch stays put and the sidebands stay clean at any depth.
 - **FM amount** — attenuverter for the FM input.
 - **Attack / Decay / Sustain / Release** — the built-in ADSR envelope.
 - **Self-generation** (lit button) — turns the envelope generator into a free-running LFO instead of a one-shot envelope, cycling Attack/Release only (Decay is skipped); Attack and Release should be turned low (towards 9 o'clock) for this to cycle usefully, and Sustain sets its peak depth. Still needs Gate to have gone high at least once (or Hold engaged) to start — it doesn't cycle on its own from silence.

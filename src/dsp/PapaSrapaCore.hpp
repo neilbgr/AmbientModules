@@ -1,6 +1,7 @@
 #pragma once
 #include <rack.hpp>
 #include "Common.hpp"
+#include "PolyBlep.hpp"
 
 using namespace rack;
 
@@ -95,9 +96,10 @@ namespace PapaSrapaRamp {
     // fastCoef/smoothCoef are 1-exp(-sampleTime/TAU) for the two FIXED taus
     // above — precomputed by the caller since they only depend on
     // sampleTime, not freq. dutyThreshold/slowCoef come from the two helpers
-    // above for this same freq.
+    // above for this same freq. dt is this freq's phase increment per sample
+    // (freq * sampleTime), used to band-limit the target square below.
     template <typename T>
-    inline T shape(T& fast, T& slow, T& smooth, T phase, T freq,
+    inline T shape(T& fast, T& slow, T& smooth, T phase, T freq, T dt,
                     T dutyThreshold, T slowCoef, float fastCoef, float smoothCoef) {
         // An asymmetric duty cycle needs asymmetric target LEVELS too, not just
         // an asymmetric time split -- spending most of the period near +1 and
@@ -111,6 +113,17 @@ namespace PapaSrapaRamp {
         T highTarget = (1.f - dutyThreshold) * 2.f;
         T lowTarget = dutyThreshold * -2.f;
         T target = simd::ifelse(phase < dutyThreshold, highTarget, lowTarget);
+        // The target still flips on the sample grid, and that hard step is
+        // what aliases on pitch sweeps — the one-pole stages below only
+        // round it off after the fact, they can't undo the fold-back.
+        // PolyBLEP-correct both edges here instead (rise at phase == 0, fall
+        // at phase == dutyThreshold); every stage below is linear, so the
+        // tuned shape is unchanged apart from the band-limiting itself. The
+        // jump is always exactly 2 (highTarget - lowTarget, whatever the
+        // duty), i.e. the standard polyBlep scale.
+        T fallDistance = phase - dutyThreshold;
+        fallDistance += simd::ifelse(fallDistance < 0.f, T(1.f), T(0.f));
+        target += polyBlep(phase, dt) - polyBlep(fallDistance, dt);
         fast += (target - fast) * fastCoef;
 
         slow += (target - slow) * slowCoef;
@@ -170,7 +183,7 @@ struct PapaSrapaModulator {
 
         phase += modFreq * sampleTime;
         phase -= std::floor(phase);
-        lfoOut = PapaSrapaRamp::shape(fast, slow, smooth, phase, modFreq, dutyThreshold, slowCoef, fastCoef, smoothCoef);
+        lfoOut = PapaSrapaRamp::shape(fast, slow, smooth, phase, modFreq, modFreq * sampleTime, dutyThreshold, slowCoef, fastCoef, smoothCoef);
         return lfoOut;
     }
 };
@@ -258,9 +271,10 @@ struct PapaSrapaCore {
         simd::float_4 audioFreq = dsp::FREQ_C4 * ambient::exp2Octaves(pitchOctaves + fmOctaves);
         audioFreq = simd::clamp(audioFreq, 0.f, sampleRate / 2.f);
 
-        audioPhase += audioFreq * sampleTime;
+        simd::float_4 audioDt = audioFreq * sampleTime;
+        audioPhase += audioDt;
         audioPhase -= simd::floor(audioPhase);
-        simd::float_4 audioSquare = PapaSrapaRamp::shape(audioFast, audioSlow, audioSmooth, audioPhase, audioFreq,
+        simd::float_4 audioSquare = PapaSrapaRamp::shape(audioFast, audioSlow, audioSmooth, audioPhase, audioFreq, audioDt,
             PapaSrapaRamp::dutyThresholdFor(audioFreq), PapaSrapaRamp::slowCoefFor(audioFreq, sampleTime), fastCoef, smoothCoef);
 
         // At modDepth == 0 this must reduce to unity gain (AM effectively
