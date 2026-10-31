@@ -52,12 +52,14 @@ struct Lunar50Drone : Module {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         for (int i = 0; i < NUM_OSC; i++) {
             configInput(TRIG_INPUT + i, string::f("Oscillator %d activation trigger (mono)", i + 1));
-            configSwitch(ACTIVE_PARAM + i, 0.f, 1.f, (i == 0 ? 1.f : 0.f), string::f("Oscillator %d active", i + 1), {"Inactive", "Active"});
+            configSwitch(ACTIVE_PARAM + i, 0.f, 1.f, (i == 0 ? 1.f : 0.f), string::f("Oscillator %d active", i + 1), {"Inactive", "Active"})->description =
+                "Lit: this oscillator is sounding (labeled MUTE on the hardware)";
             configParam(FREQ_PARAM + i, -8.f, 4.f, -1.f, string::f("Oscillator %d frequency", i + 1), " Hz", 2.f, dsp::FREQ_C4);
-            configSwitch(MOD_PARAM + i, 0.f, 1.f, (i == 0 ? 1.f : 0.f), string::f("Oscillator %d modulation", i + 1), {"Off", "On"});
+            configSwitch(MOD_PARAM + i, 0.f, 1.f, (i == 0 ? 1.f : 0.f), string::f("Oscillator %d modulation", i + 1), {"Off", "On"})->description =
+                "Lit: this oscillator's pitch follows the Frequency CV input";
         }
         configParam(ATTEN_PARAM, -1.f, 1.f, 1.f, "CV Attenuverter", "%", 0.f, 100.f);
-        configInput(CV_INPUT, "Frequency CV (applies to all oscillators)");
+        configInput(CV_INPUT, "Frequency CV (oscillators with modulation on)");
         configOutput(SAW_OUTPUT, "Sawtooth mix");
 
         configSwitch(HOLD_PARAM, 0.f, 1.f, 0.f, "Hold (manual gate)", {"Off", "On"});

@@ -40,7 +40,8 @@ struct LunarPads : Module {
             "Drone 4 (Solar50)", "Drone 5 (Solar50)", "Drone 6 (PapaSrapa)"
         };
         for (int i = 0; i < NUM_PADS; i++) {
-            configButton(PAD_PARAM + i, labels[i]);
+            configButton(PAD_PARAM + i, labels[i])->description =
+                "Patch the matching gate output into that voice's Gate input";
             configInput(GATE_INPUT + i, string::f("%s external gate (e.g. MIDI)", labels[i]));
             configOutput(GATE_OUTPUT + i, string::f("%s gate", labels[i]));
         }
