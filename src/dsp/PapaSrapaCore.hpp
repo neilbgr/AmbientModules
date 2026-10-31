@@ -191,10 +191,9 @@ struct PapaSrapaModulator {
 // One "Papa Srapa" audio voice (Solar 42F drone voices 3/6): a square audio
 // oscillator (roughly C0..E7) cross-modulated (FM and/or AM) by an
 // externally supplied modulator signal (see PapaSrapaModulator — shared
-// across all poly channels, not per-voice). The white-noise mix is likewise
-// a single shared source (see LunarPapaSrapa.cpp) rather than one generator
-// per voice — a single noise source is enough even with the main VCO
-// polyphonic. Not a literal circuit emulation of the real coupled
+// across all poly channels, not per-voice). The white-noise mix comes from
+// one generator per voice (see LunarPapaSrapa.cpp), so poly voices stay
+// uncorrelated. Not a literal circuit emulation of the real coupled
 // Trigger-Schmidt oscillators (undocumented, chaotic) — an idiomatic
 // approximation in the spirit of DroneVoice/LunarVCOCore/TriSquareLFO, tuned
 // by ear against the real hardware. Pure DSP, no Module/param/light
@@ -241,10 +240,9 @@ struct PapaSrapaCore {
     // front-loaded against the real hardware, AM tested fine with the linear
     // knob). modMode: which of FM/AM (or both/neither) is active —
     // module-wide (a single FM/AM switch pair, not per-channel). noiseSample:
-    // the shared white-noise source's current sample (see
-    // LunarPapaSrapa.cpp), mixed in at noiseAmount (0..1) — both
-    // module-wide. noiseOnly: bypasses the square oscillator entirely,
-    // returning noiseSample directly at unity gain for every lane —
+    // each channel's own white-noise sample (see LunarPapaSrapa.cpp), mixed
+    // in at noiseAmount (0..1, module-wide). noiseOnly: bypasses the square
+    // oscillator entirely, returning noiseSample directly at unity gain —
     // module-wide. The caller (LunarPapaSrapa.cpp) already decides at the
     // group level whether to call process() at all, skipping it entirely
     // when every lane in the group is silent — the per-channel
@@ -253,9 +251,9 @@ struct PapaSrapaCore {
     // Returns the mixed output in roughly [-1, 1], one lane per channel.
     simd::float_4 process(float sampleTime, float sampleRate, simd::float_4 pitchOctaves,
                            simd::float_4 modSquare, simd::float_4 modDepth, simd::float_4 fmDepth, ModMode modMode,
-                           float noiseSample, float noiseAmount, bool noiseOnly) {
+                           simd::float_4 noiseSample, float noiseAmount, bool noiseOnly) {
         if (noiseOnly) {
-            return simd::float_4(noiseSample);
+            return noiseSample;
         }
 
         if (sampleTime != cachedSampleTime) {

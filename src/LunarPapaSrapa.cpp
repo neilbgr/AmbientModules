@@ -105,14 +105,16 @@ struct LunarPapaSrapa : Module {
     // value/noise-PRNG state per channel, mirroring gateTrigger/envelope
     // above. Each channel's shNoiseState is seeded differently so unpatched
     // Signal (normalled to noise) doesn't sample identical "random" values
-    // on every channel at once.
+    // on every channel at once — and seeded from Rack's global RNG rather
+    // than a fixed constant, so two PapaSrapa instances (or the same patch
+    // loaded twice) don't produce identical S&H sequences.
     dsp::SchmittTrigger shClockTrigger[PORT_MAX_CHANNELS];
     float shValue[PORT_MAX_CHANNELS] = {};
     uint32_t shNoiseState[PORT_MAX_CHANNELS];
-    // The white-noise mix into the audio output is also a single shared
-    // source (see process()) rather than one generator per poly voice —
-    // decoupled from shNoiseState above since the two are gated separately.
-    uint32_t noiseState = 0x1234567u;
+    // The white-noise mix into the audio output gets its own generator per
+    // poly voice too, so voices stay uncorrelated — decoupled from
+    // shNoiseState above since the two are gated separately.
+    uint32_t noiseState[PORT_MAX_CHANNELS];
 
     // RATE_PARAM's pow(pos, RATE_CURVE_EXP) taper, cached while the knob
     // doesn't move (no CV on this knob) instead of a powf every sample.
@@ -121,8 +123,10 @@ struct LunarPapaSrapa : Module {
 
     LunarPapaSrapa() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
+        // xorshift32 must never be seeded with 0 (it would stay stuck at 0).
         for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
-            shNoiseState[c] = 0x1234567u + c * 0x9E3779B9u;
+            shNoiseState[c] = random::u32() | 1u;
+            noiseState[c] = random::u32() | 1u;
         }
 
         float rateDefaultPos = std::pow((2.f - RATE_MIN_OCT) / (RATE_MAX_OCT - RATE_MIN_OCT), 1.f / RATE_CURVE_EXP);
@@ -255,12 +259,16 @@ struct LunarPapaSrapa : Module {
             modSquareValues[c] = needMod ? modulator[c].process(args.sampleTime, rateOctaves, dividerAmount) : modulator[c].lfoOut;
         }
 
-        // The audio noise mix is a single shared source too — one sample per
-        // process() call is enough even with the main VCO polyphonic, since
-        // every channel mixes in the same value at its own noiseAmount.
-        // Computed only when actually needed (mixed in, or noiseOnly bypass).
+        // The audio noise mix is one independent generator per channel, so
+        // poly voices don't all mix in the same noise. Computed only when
+        // actually needed (mixed in, or noiseOnly bypass).
         bool needNoise = anyComputeAudio && (noiseOnly || noiseAmount > 0.f);
-        float noiseSample = needNoise ? PapaSrapaCore::nextNoise(noiseState) : 0.f;
+        float noiseValues[PORT_MAX_CHANNELS] = {};
+        if (needNoise) {
+            for (int c = 0; c < channels; c++) {
+                noiseValues[c] = PapaSrapaCore::nextNoise(noiseState[c]);
+            }
+        }
 
         outputs[LFO_OUTPUT].setChannels(channels);
         for (int c = 0; c < channels; c++) {
@@ -293,6 +301,7 @@ struct LunarPapaSrapa : Module {
             simd::float_4 modSquare4 = simd::float_4::load(&modSquareValues[base]);
             simd::float_4 modAmount4 = simd::float_4::load(&modAmountValues[base]);
             simd::float_4 fmDepth4 = simd::float_4::load(&fmDepthValues[base]);
+            simd::float_4 noise4 = simd::float_4::load(&noiseValues[base]);
 
             // VCO_OUT is enveloped, so its audio oscillator is only computed
             // when patched AND at least one lane's envelope is above 0
@@ -304,7 +313,7 @@ struct LunarPapaSrapa : Module {
             simd::float_4 vco4 = simd::float_4::zero();
             if (vcoOutputConnected && simd::movemask(envAmount4 > 0.f) != 0) {
                 vco4 = core[base / 4].process(args.sampleTime, args.sampleRate, pitchOctaves4,
-                    modSquare4, modAmount4, fmDepth4, mode, noiseSample, noiseAmount, noiseOnly);
+                    modSquare4, modAmount4, fmDepth4, mode, noise4, noiseAmount, noiseOnly);
             }
 
             outputs[VCO_OUT].setVoltageSimd(vco4 * OUTPUT_VOLTAGE * envAmount4, base);

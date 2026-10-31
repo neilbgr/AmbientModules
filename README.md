@@ -198,7 +198,7 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 - **am** (lit button) — routes the modulator into the audio oscillator's amplitude. FM and AM can be enabled together.
 - **Divider** — divides down the modulator's frequency relative to the audio oscillator, plus its CV input.
 - **Pitch** — the audio oscillator's pitch, spanning C0 to E7.
-- **Noise** — mix level of the internal white noise source, shared across every polyphonic voice (not decorrelated per voice — the real hardware only has one noise generator per module).
+- **Noise** — mix level of the internal white noise source. Each polyphonic voice, and each module instance, gets its own uncorrelated noise, freshly seeded every time the module is created or the patch is loaded.
 - **Noise only** (lit button) — forces a clean white-noise-only output, overriding Pitch/FM/AM/Divider.
 - **Attack / Release** — the shared envelope.
 - **Hold** (lit button) — see [Shared conventions](#shared-conventions).
@@ -206,7 +206,7 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 **Inputs**
 - **Modulation depth CV**, **Divider CV** — sum onto their respective knobs; polyphonic, read independently per channel, each driving its own per-channel modulator (see LFO output below) — so different channels can have their own FM/AM depth and modulator rate.
 - **Pitch CV** — 1V/oct, sums onto the Pitch knob.
-- **Sample & hold input** — the source to sample; normalled to the internal noise generator when nothing is patched here; polyphonic, same channel count as Sample & hold clock.
+- **Sample & hold input** — the source to sample; normalled to the internal noise generator when nothing is patched here (its own random sequence per channel and per module instance, different on every patch load); polyphonic, same channel count as Sample & hold clock.
 - **Sample & hold clock** — samples a new value on each rising edge; polyphonic, with its own channel count driven by Sample & hold clock/input (independent from the rest of the panel — see Outputs below).
 - **Envelope CV** — see [Shared conventions](#shared-conventions).
 - **Gate** — opens the envelope while high (ignored if Hold is engaged or Envelope CV is patched).
