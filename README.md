@@ -1,5 +1,9 @@
 # AmbientModules — User Manual
 
+I wanted to recreate in VCV Rack / Cardinal some performances I had seen on YouTube played on the SOLAR 42F. Having tried with existing modules first, I built this collection instead: to save CPU, to make the SOLAR 42F's sections modular enough that you only use what you need, and to pay tribute to the synth's distinctive graphic style.
+
+The modules try to stay as faithful to the hardware as possible. As far as I know, Elta Music doesn't publish any technical reference describing exactly what each section does and how, so this fidelity is built from the SOLAR 42F user manual and from demo videos of the real instrument.
+
 **AmbientModules** is a collection of VCV Rack / Cardinal modules inspired by the [Elta Music](https://www.eltamusic.com) [ **SOLAR 42F** "Ambient Drone Machine"](https://www.eltamusic.com/solar-42f)  — an analog microtonal drone synthesizer. Rather than reproducing the SOLAR 42F's fixed hardware layout, each of its sound engines is broken out here into an independent, freely-patchable Rack module:
 
 ![All AmbientModules panels, Cream theme](docs/images/AllModules_Cream.png)
@@ -142,6 +146,8 @@ An empty panel with no parameters, inputs, or outputs — a spacer/template modu
 
 ![Lunar50Drone panel](docs/images/Lunar50Drone.png)
 
+For chords that are more or less rich, and more or less dissonant. It also works as a ready-to-use VCO, with pitch modulation, a volume envelope and a built-in VCA. For dark ambient sounds, the **Volt** knob gives interesting distortions: detuning down towards the low end, and even FM.
+
 Five simple sawtooth oscillators sharing one output and one envelope — the Classic Solar 50 drone voice. Each of the 5 oscillators can be switched on or off independently to build chords and triads, and the **Volt** knob detunes and then cross-modulates them together for FM-style drone textures, exactly as on the original hardware.
 
 🎛️ **Knobs & switches**
@@ -224,6 +230,8 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 
 ![LunarVCO panel](docs/images/LunarVCO.png)
 
+A complete VCO, with pitch modulation, an amplitude envelope, a built-in VCA and many waveforms, often used for melodic leads. Often paired with a second, slightly detuned instance; add the optional sub oscillator and you get rich sounds and very different textures.
+
 An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B" voice — with 6 waveforms, hard sync, linear or exponential FM, and a full ADSR envelope built in.
 
 🎛️ **Knobs & switches**
@@ -292,6 +300,8 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 ### LunarPapaSrapa
 
 ![LunarPapaSrapa panel](docs/images/LunarPapaSrapa.png)
+
+A VCO with a very strong character: you get the best out of it by pushing it to its limits. I use it for bass sounds as much as for two-tone sirens. Its S&H and noise sections are an extra source of surprises, ready to be patched into anything else.
 
 The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modulator cross-modulating an audio-rate square oscillator (FM and/or AM), blended with independent white noise, plus a built-in sample & hold and envelope.
 
@@ -368,6 +378,8 @@ The SOLAR 42F's "Papa Srapa" noise/drone voice: a low-frequency square-wave modu
 
 ![LunarLFO panel](docs/images/LunarLFO.png)
 
+Often used to make a patch breathe and come alive, by slowly modulating the filter cutoff with one of its outputs. It can of course modulate anything you like, and even serve as a clock using its square waveform.
+
 Two independent, unipolar (by default) LFOs — LFO A and LFO B — each blending continuously between a triangle and a square wave.
 
 🎛️ **Knobs**
@@ -400,6 +412,8 @@ Two independent, unipolar (by default) LFOs — LFO A and LFO B — each blendin
 ### LunarSequencer
 
 ![LunarSequencer panel](docs/images/LunarSequencer.png)
+
+Creativity born from constraints: this sequencer, modelled on the SOLAR 42F's Buchla-style 3-to-5-stage sequencer, has no reset, no run/stop, and its knobs show voltages, not pitches... So it's up to you to bring it to life!
 
 A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step stores its own CV (0–100%, rescaled to volts by the CV Range setting) and its own gate on/off.
 
@@ -460,6 +474,8 @@ A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step sto
 
 ![LunarMixer panel](docs/images/LunarMixer.png)
 
+Placed just to the left of a [LunarFilter](#lunarfilter), this mixer lets you fine-tune the mix and panning of a patch holding every part of a SOLAR 42. The level meter then shows the neighbouring LunarFilter's output.
+
 The SOLAR 42F's 9-channel panoramic mixer page: one row per channel (In / Level / Pan), summed to a shared stereo output with a master level knob. Straight sum, no automatic gain compensation or soft-clipping — same as the hardware mixer page and the standard Eurorack mixer convention, so gain-stage with the Level knobs directly.
 
 🎛️ **Knobs**
@@ -513,6 +529,8 @@ The SOLAR 42F's 9-channel panoramic mixer page: one row per channel (In / Level 
 ### LunarFilter
 
 ![LunarFilter panel](docs/images/LunarFilter.png)
+
+Placed just to the right of a [LunarMixer](#lunarmixer), LunarFilter brings the grit and the final touch of a SOLAR 42. It's a stereo filter: one filter for the left channel, another for the right. Don't forget the effects insert, which stands in for the hardware's famous effect cartridges: in VCV Rack / Cardinal you can insert your own reverbs, phasers, delays... your favourite effects, and dial in exactly how much of them you want. For a big sound, even one that overflows, the distortion is there for that.
 
 Reimplements the SOLAR 42F's "FILTER" block: two independent 12dB Polivoks-style multimode (Low-pass/Band-pass) filters, meant to follow [LunarMixer](#lunarmixer)'s stereo output, plus a shared distortion stage — same chain as the real hardware (Mixer → Dual filter → Distortion). Past the distortion stage, this module also adds a practical (not hardware-faithful) stereo FX-insert loop, for patching an arbitrary external effects chain in before the final Master level: Filter+Distortion → **Send** → *(your effects)* → **Return** → Blend → Master → Out.
 
@@ -606,6 +624,8 @@ The real hardware only exposes one CV input (Filter L's frequency only); this mo
 
 ![LunarJoystick panel](docs/images/LunarJoystick.png)
 
+Both visual and practical: use it to modulate the filter cutoff, the saturation, or anything else, from your favourite MIDI controller as well as directly with the mouse.
+
 Electrical equivalent of the SOLAR 42F Joystick block, without the physical stick: a draggable XY pad producing independent X/Y position voltages, each either manual (drag the pad) or driven by an external CV, plus a per-axis input-range selector and offset — matching the 3 example ranges in the original manual (offset left/center/right → -10V to 0V / -5V to +5V / 0V to +10V).
 
 🕹️ **XY pad**
@@ -653,6 +673,8 @@ Electrical equivalent of the SOLAR 42F Joystick block, without the physical stic
 
 ![LunarPads panel](docs/images/LunarPads.png)
 
+A pad grid you can play directly with the mouse (Ctrl+click holds a pad) as well as from your favourite MIDI controller. It also shows at a glance which drones you have switched on during a performance.
+
 The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 drone voices (Drone 1/2/4/5 = [Lunar50Drone](#lunar50drone) "Classic Solar 50", Drone 3/6 = [LunarPapaSrapa](#lunarpapasrapa)). VCO A/B aren't covered here — they already have their own gate/envelope, driven by the touch keyboard on the real hardware.
 
 🔘 **Pads**
@@ -692,6 +714,8 @@ The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 dro
 ### LunarDetector
 
 ![LunarDetector panel](docs/images/LunarDetector.png)
+
+With experience comes the need for an envelope follower. Its source can be an audio sample, for example, and its gate and/or envelope detection can trigger or attenuate effects, or modulate anything you like.
 
 Reimplements the SOLAR 42F's "CONTACT MIC + ENVELOPE FOLLOWER" block: a preamp, an Attack/Release envelope follower, and a hysteresis gate detector. The real hardware normally reads its internal piezo contact mic unless an external source is patched into its EXT.SOURCE jack, which then takes over instead — there's no piezo to simulate in software, so this module only exposes that external-source path.
 
