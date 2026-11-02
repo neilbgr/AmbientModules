@@ -41,6 +41,7 @@ The modules try to stay as faithful to the hardware as possible. As far as I kno
   - [LunarJoystick](#lunarjoystick)
   - [LunarPads](#lunarpads)
   - [LunarDetector](#lunardetector)
+- [Building and testing](#building-and-testing)
 - [AI disclosure](#ai-disclosure)
 
 ## Videos
@@ -739,6 +740,20 @@ Reimplements the SOLAR 42F's "CONTACT MIC + ENVELOPE FOLLOWER" block: a preamp, 
 > [!TIP]
 > **Patch ideas**
 > - Feed a contact mic, guitar, or any line-level source into In, then use Gate to trigger [Lunar50Drone](#lunar50drone) or [LunarPapaSrapa](#lunarpapasrapa)'s Gate input and Envelope to modulate a filter or VCA elsewhere in the patch.
+
+## Building and testing
+
+Build the plugin like any other Rack plugin, with `RACK_DIR` pointing at the Rack SDK:
+
+```sh
+make RACK_DIR=/path/to/Rack-SDK
+```
+
+`make test` builds and runs the DSP unit tests (`test/dsp_tests.cpp`): they cover LunarFilter's Polivoks-style filter (stability, ring-down, self-oscillation pitch and level, recovery from NaN/inf input), the AR and ADSR envelopes, the shared math helpers, and LunarPapaSrapa's modulator. They are compiled against `src/dsp` and the Rack SDK headers only, with the same math flags as the plugin build, without running the Rack engine. They use the host `g++` when there is one, otherwise MinGW (a static `.exe`, run through WSL's Windows interop):
+
+```sh
+make test RACK_DIR=/path/to/Rack-SDK
+```
 
 ## AI disclosure
 
