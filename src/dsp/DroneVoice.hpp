@@ -75,11 +75,13 @@ struct DroneVoice {
                           + detuneOctaves + fmAmount * fmSource * FM_DEPTH_OCTAVES;
 
             float freq = dsp::FREQ_C4 * ambient::exp2Octaves(pitch);
-            freq = clamp(freq, 0.f, sampleRate / 2.f);
+            // Capped at maxOscillatorFreq() (20 kHz, or 0.45 fs below
+            // 44.4 kHz): CV and FM can't push it up to Nyquist.
+            freq = clamp(freq, 0.f, ambient::maxOscillatorFreq(sampleRate));
 
             // Phase keeps running even when inactive, so re-enabling an
             // oscillator doesn't cause an audible phase jump.
-            float deltaPhase = std::fmin(freq * sampleTime, 0.5f);
+            float deltaPhase = freq * sampleTime;
             phase[i] += deltaPhase;
             phase[i] -= std::trunc(phase[i]);
 

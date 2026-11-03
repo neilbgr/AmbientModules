@@ -124,8 +124,10 @@ A few behaviors repeat across several modules and are only explained here:
   - The module's channel count follows whichever of those inputs carries the most channels, or the Envelope CV input if that's higher still.
   - So patching a polyphonic V/OCT or Gate signal (from a polyphonic sequencer, MIDI-to-CV, etc.) into any of those inputs, or chaining another module's polyphonic Envelope output into Envelope CV, drives independent voices per channel throughout the module.
 - **Band-limited oscillators**
-  - Lunar50Drone, LunarVCO, and LunarPapaSrapa correct every hard edge and corner of their waveforms (PolyBLEP/BLAMP), including LunarVCO's morphing shapes and hard sync.
-  - This keeps digital aliasing low at a negligible CPU cost.
+  - Lunar50Drone, LunarVCO, and LunarPapaSrapa correct every hard edge and corner of their waveforms, to keep digital aliasing low at a small CPU cost.
+  - Lunar50Drone and LunarPapaSrapa use PolyBLEP.
+  - LunarVCO uses a minimum-phase BLEP (the same as VCV's Fundamental VCO) on every hard edge (Square, including under pulse-width modulation, the saws, the sub and hard sync), and a 4-point PolyBLAMP on the corners of Triangle and Saw to inverted saw. Near its sawtooth ends, where one ramp of Saw to inverted saw gets only a couple of samples long, that ramp is band-limited as an edge instead. Its output comes out 3 samples late (62 µs at 48 kHz) for this (OSC Out, the raw phase, isn't delayed).
+  - All three oscillators stop at 20 kHz (or 0.45 × the sample rate, below 44.4 kHz), however much CV or FM is applied.
   - Very deep audio-rate FM can still alias a little on the brighter waveforms.
 - **Envelope CV override**
   - Lunar50Drone, LunarVCO, and LunarPapaSrapa each have an **Envelope CV** input.
@@ -241,9 +243,12 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
     - Sine, Triangle, Inverted saw, Square.
     - Saw-to-inverted-saw and Sine-to-saw, both morphed by Shape.
 - **Sub oscillator** (lit button)
-  - Adds a sub-oscillator one octave below.
+  - Adds a sub-oscillator one octave below (below the base pitch: Oct +3 moves the main only).
+  - As on the hardware, it divides the main: its edges always fall on the main's cycle start, so main and sub always mix the same way, whenever the sub is switched on.
+  - Its square has sharp edges at any pitch, as on the hardware (measured on Elta's demo video).
 - **Shape**
   - Pulse width (square) or morph blend (the two morphing waveforms), plus its CV amount attenuverter.
+  - As on the hardware, the pulse vanishes with Shape fully clockwise (or fully counter-clockwise), leaving only the sub when it's on. No click and no DC offset on the way.
 - **Tune**
   - ±0.5 octave fine tune.
 - **Octave** (lit button)
@@ -267,6 +272,7 @@ An AS3340-style voltage-controlled oscillator — the SOLAR 42F's "VCO A / VCO B
 📥 **Inputs**
 - **Sync**
   - Hard-syncs the oscillator's phase to the incoming signal.
+  - Each restart also steps the sub's divider, like the end of a cycle.
 - **Shape CV**
   - Modulates the Shape knob, scaled by its attenuverter.
 - **V/oct**
@@ -749,7 +755,7 @@ Build the plugin like any other Rack plugin, with `RACK_DIR` pointing at the Rac
 make RACK_DIR=/path/to/Rack-SDK
 ```
 
-`make test` builds and runs the DSP unit tests (`test/dsp_tests.cpp`): they cover LunarFilter's Polivoks-style filter (stability, ring-down, self-oscillation pitch and level, recovery from NaN/inf input), the AR and ADSR envelopes, the shared math helpers, and LunarPapaSrapa's modulator. They are compiled against `src/dsp` and the Rack SDK headers only, with the same math flags as the plugin build, without running the Rack engine. They use the host `g++` when there is one, otherwise MinGW (a static `.exe`, run through WSL's Windows interop):
+`make test` builds and runs the DSP unit tests (`test/dsp_tests.cpp`): they cover LunarFilter's Polivoks-style filter (stability, ring-down, self-oscillation pitch and level, recovery from NaN/inf input), the AR and ADSR envelopes, the shared math helpers, LunarPapaSrapa's modulator, and LunarVCO's oscillator (aliasing measured for every waveform, frequency cap, pulse width at 0/100%, sub rounding and locking, robustness under through-zero FM and hard sync). They are compiled against `src/dsp` and the Rack SDK headers only, with the same math flags as the plugin build, without running the Rack engine. They use the host `g++` when there is one, otherwise MinGW (a static `.exe`, run through WSL's Windows interop):
 
 ```sh
 make test RACK_DIR=/path/to/Rack-SDK

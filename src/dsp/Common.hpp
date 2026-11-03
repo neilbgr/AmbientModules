@@ -44,6 +44,14 @@ inline simd::float_4 fastTanh(simd::float_4 x) {
     return x * (27.f + x * x) / (27.f + 9.f * x * x);
 }
 
+// Upper frequency limit for the pack's audio oscillators: 20 kHz, or
+// 0.45 x the sample rate when that is lower (below 44.4 kHz). The margin
+// below Nyquist keeps a waveform from degenerating into 2 samples per
+// period, where band-limiting corrections can no longer work.
+inline float maxOscillatorFreq(float sampleRate) {
+    return std::min(20000.f, 0.45f * sampleRate);
+}
+
 // Accurate drop-in for std::tanh where the exact curve matters (e.g. a
 // pre-existing std::tanh whose sound must not change): Lambert's continued
 // fraction truncated to a (7,6) rational, clamped at +-4.97 (where it

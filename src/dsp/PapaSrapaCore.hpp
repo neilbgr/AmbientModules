@@ -267,7 +267,9 @@ struct PapaSrapaCore {
 
         simd::float_4 fmOctaves = fmOn ? modSquare * fmDepth * 2.f : simd::float_4::zero(); // up to +-2 octaves
         simd::float_4 audioFreq = dsp::FREQ_C4 * ambient::exp2Octaves(pitchOctaves + fmOctaves);
-        audioFreq = simd::clamp(audioFreq, 0.f, sampleRate / 2.f);
+        // Capped at maxOscillatorFreq() (20 kHz, or 0.45 fs below 44.4 kHz):
+        // CV can't push the oscillator up to Nyquist.
+        audioFreq = simd::clamp(audioFreq, 0.f, ambient::maxOscillatorFreq(sampleRate));
 
         simd::float_4 audioDt = audioFreq * sampleTime;
         audioPhase += audioDt;

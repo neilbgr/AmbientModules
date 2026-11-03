@@ -176,8 +176,7 @@ struct LunarVCO : Module {
                     + inputs[SHAPE_CV_INPUT].getPolyVoltageSimd<simd::float_4>(base) / 10.f * shapeCvAtten, 0.f, 1.f);
 
                 dry4 = vco[base / 4].process(args.sampleTime, args.sampleRate, pitch4, expFm4, linFm4,
-                    waveform, shape4, octaveOn, subOscOn, inputs[SYNC_INPUT].getPolyVoltageSimd<simd::float_4>(base),
-                    inputs[SYNC_INPUT].isConnected());
+                    waveform, shape4, octaveOn, subOscOn, inputs[SYNC_INPUT].getPolyVoltageSimd<simd::float_4>(base));
             }
 
             outputs[VCO_OUTPUT].setVoltageSimd(dry4 * 5.f * envValue4, base);
