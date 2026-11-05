@@ -1,7 +1,7 @@
 {
   "plugin": "AmbientModules",
   "model": "Lunar50Drone",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "params": [
     {
       "id": 0,
