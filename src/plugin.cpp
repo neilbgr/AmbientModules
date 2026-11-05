@@ -5,7 +5,7 @@ Plugin *pluginInstance;
 
 void init(Plugin *p) {
     pluginInstance = p;
-    loadAmbientTheme();
+    loadAmbientSettings();
     p->addModel(modelBlank);
     p->addModel(modelLunar50Drone);
     p->addModel(modelLunarLFO);

@@ -1,5 +1,6 @@
 #pragma once
 #include <rack.hpp>
+#include <cstring>
 #include "Common.hpp"
 #include "PolyBlep.hpp"
 
@@ -30,6 +31,8 @@ struct DroneVoice {
 
     float phase[NUM_OSC] = {};
     float prevSaw[NUM_OSC] = {};
+    // Last sample's phase step, for the LEDs (DroneLights).
+    float lastDeltaPhase[NUM_OSC] = {};
     int fmTopology = 0; // 0 = average of active others, 1 = circular chain
     // true = hardware tone (the two poles above), false = the plain bright
     // saw of 2.5.1 and earlier.
@@ -132,6 +135,7 @@ struct DroneVoice {
             float deltaPhase = freq * sampleTime;
             phase[i] += deltaPhase;
             phase[i] -= std::trunc(phase[i]);
+            lastDeltaPhase[i] = deltaPhase;
 
             float sawValue = 2.f * (phase[i] - std::round(phase[i]));
             // The cross-FM source stays the naive saw: it only drives pitch,
@@ -154,5 +158,87 @@ struct DroneVoice {
         }
 
         return tone(mix, sampleRate);
+    }
+};
+
+// The 5 oscillator LEDs of one DroneVoice, like the hardware's OSC STATUS
+// LEDs: each follows its saw's ramp (0 right after the falling edge, 1 just
+// before it: saw = 2 ramp - 1). A slow oscillator blinks with its ramp, an
+// audio-rate one glows steadily. Display only: it never touches the
+// voice, so the LED setting can't change the sound. Called every few
+// samples (Lunar50Drone: 16), on channel 0.
+struct DroneLights {
+    static const int NUM_OSC = DroneVoice::NUM_OSC;
+    // Smoothing (1/s, a symmetric one-pole, like an eye; Rack's
+    // setBrightnessSmooth() lights up instantly, a peak follower that
+    // wouldn't average).
+    static constexpr float LAMBDA = 60.f;
+    // Gain from x1 at SLOW_HZ and below (the LED shows the whole ramp) to
+    // x2 at FAST_HZ and above (the steady 0.5 glow becomes full
+    // brightness), log-interpolated between.
+    static constexpr float SLOW_HZ = 2.f;
+    static constexpr float FAST_HZ = 20.f;
+    static constexpr float SPAN_OCTAVES = 3.321928f; // log2(FAST_HZ / SLOW_HZ)
+
+    // The LEDs' own phases: copied from the voice while it runs, and run
+    // on their own while it's skipped (envelope closed), cross-FM left out.
+    float phase[NUM_OSC] = {};
+    float level[NUM_OSC] = {};
+
+    // Mitchell's log2 (exponent + linear mantissa, within 0.09 octave):
+    // plenty for an LED gain; std::log2 here measured ~8 ns/sample, as
+    // much as a fifth of the whole voice.
+    static float cheapLog2(float x) {
+        int32_t bits;
+        std::memcpy(&bits, &x, sizeof(bits));
+        return (float) bits * (1.f / 8388608.f) - 127.f;
+    }
+
+    // Integral of the ramp frac(x) from 0 to x.
+    static float rampIntegral(float x) {
+        float whole = std::floor(x);
+        float r = x - whole;
+        return 0.5f * (whole + r * r);
+    }
+
+    // The ramp averaged exactly over the phase travelled up to rampEnd, so
+    // there's no aliasing whatever the pitch: an audio-rate one is 0.5.
+    static float rampMean(float rampEnd, float travelled) {
+        if (travelled < 1e-6f) {
+            return rampEnd;
+        }
+        return (rampIntegral(rampEnd) - rampIntegral(rampEnd - travelled)) / travelled;
+    }
+
+    // samples: since the last call. voiceRan: the voice's process() ran
+    // on its last sample, so its phases are current. Writes the 5
+    // brightnesses (0..1) to brightness[].
+    void update(const DroneVoice& voice, bool voiceRan, int samples, float sampleTime,
+                const float pitchParams[NUM_OSC], const bool active[NUM_OSC], const bool mod[NUM_OSC],
+                float cv, float volt, float brightness[NUM_OSC]) {
+        float elapsed = samples * sampleTime;
+        float coef = std::fmin(LAMBDA * elapsed, 1.f);
+        float detuneOctaves = -DroneVoice::DETUNE_MAX_OCTAVES * clamp(volt * 2.f, 0.f, 1.f);
+        for (int i = 0; i < NUM_OSC; i++) {
+            float travelled;
+            if (voiceRan) {
+                phase[i] = voice.phase[i];
+                travelled = voice.lastDeltaPhase[i] * samples;
+            } else {
+                float pitch = pitchParams[i] + (mod[i] ? cv : 0.f) + detuneOctaves;
+                float freq = dsp::FREQ_C4 * ambient::exp2Octaves(pitch);
+                freq = clamp(freq, 0.f, ambient::maxOscillatorFreq(1.f / sampleTime));
+                travelled = freq * elapsed;
+                phase[i] += travelled;
+                phase[i] -= std::trunc(phase[i]);
+            }
+            float rampEnd = phase[i] + 0.5f;
+            rampEnd -= std::trunc(rampEnd);
+            level[i] = active[i] ? level[i] + (rampMean(rampEnd, travelled) - level[i]) * coef : 0.f;
+
+            float freq = travelled / elapsed;
+            float fast = clamp(cheapLog2(std::fmax(freq, 1e-3f) / SLOW_HZ) / SPAN_OCTAVES, 0.f, 1.f);
+            brightness[i] = std::fmin((1.f + fast) * level[i], 1.f);
+        }
     }
 };

@@ -156,6 +156,7 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 🎛️ **Knobs & switches**
 - **Oscillator 1–5 active** (lit button, labeled **ON** on the panel; **MUTE** on the hardware)
   - Lit = that oscillator is sounding, unlit = muted.
+  - The light follows its oscillator, like the hardware's OSC STATUS LEDs: a slow oscillator (sub-audio) blinks with its sawtooth ramp, an audio-rate one glows steadily. It follows the oscillator, not the envelope, so it keeps moving while the drone is silent. *On/off only* in the right-click menu turns this off.
   - Can also be toggled from the corresponding trigger input.
   - Not polyphonic: a single on/off state per oscillator, shared identically by every poly channel. There's no per-channel "active" state.
   - Oscillator 1 defaults to active, the other four to inactive, so a freshly-added module produces sound immediately instead of silence.
@@ -211,6 +212,14 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 
 <a id="lunar50drone-context-menu"></a>
 🖱️ **Context menu**
+
+![Lunar50Drone context menu](docs/images/Lunar50Drone_Menu.png)
+
+- Under *Global*: **Theme** (see [Right-click menu](#right-click-menu)) and **Oscillator LEDs**, both pack-wide. The entries below them are this module's own, saved in the patch.
+- **Oscillator LEDs (all AmbientModules)**
+  - *Follow the oscillator* (default): the oscillator lights blink or glow with their oscillator (see *Oscillator 1–5 active* above).
+  - *On/off only*: plain on/off lights, as in 2.5.1 and earlier.
+  - Pack-wide, like the theme: saved in your Rack user folder (`AmbientModules.json`), not in the patch, so it applies to every Lunar50Drone at once. Following the oscillator costs about 1–3 ns per sample, so *On/off only* is mostly for taste.
 - **FM topology**
   - How the "Modulation"-enabled oscillators cross-modulate once the Volt knob passes its midpoint:
     - *Average of active others*: each modulated oscillator is pushed by the average of the other active oscillators.
@@ -224,8 +233,10 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
 - **Tone**
   - *Hardware*: the darker tone of the real Classic Solar 50 voice. It was measured on Elta Music's demo, with one oscillator alone and the filter fully open, at 41, 100 and 634 Hz. The roll-off is fixed in Hz, whatever the pitch: about −9 dB at 4 kHz and −16 dB at 8 kHz against a plain sawtooth. This is the default for a new module.
   - *Bright (2.5.1 and earlier)*: the plain sawtooth. Patches saved before 2.5.2 open in this mode, so they sound exactly as before.
+- **Apply these settings to all Lunar50Drone in the patch**: copies this module's FM topology, oscillator mix and tone to every other Lunar50Drone in the patch, as one undo step.
+- **Use these settings for new Lunar50Drone**: every Lunar50Drone you add from then on starts with this module's FM topology, oscillator mix and tone. The default is kept in `AmbientModules.json`; each module still saves its own settings in the patch, so a patch sounds the same on any machine, and patches saved before these options existed still open in the legacy modes.
 
-![Lunar50Drone FM topology submenu](docs/images/Lunar50Drone_Menu_FMTypologies.png) ![Lunar50Drone Oscillator mix submenu](docs/images/Lunar50Drone_Menu_Mix.png) ![Lunar50Drone Tone submenu](docs/images/Lunar50Drone_Menu_Tone.png)
+![Lunar50Drone FM topology submenu](docs/images/Lunar50Drone_Menu_FMTypologies.png) ![Lunar50Drone Oscillator mix submenu](docs/images/Lunar50Drone_Menu_Mix.png) ![Lunar50Drone Tone submenu](docs/images/Lunar50Drone_Menu_Tone.png) ![Lunar50Drone Oscillator LEDs submenu](docs/images/Lunar50Drone_Menu_LedsMode.png)
 
 🎹 **Factory presets** (Preset ▸ Factory presets)
 - The SOLAR 42F's spirit stays microtonal and approximate: its oscillators are tuned by ear, not to a scale. These presets are only a starting point, for those who want chords from Western harmony.

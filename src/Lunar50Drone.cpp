@@ -48,6 +48,13 @@ struct Lunar50Drone : Module {
     AREnvelope envelope[PORT_MAX_CHANNELS];
     dsp::SchmittTrigger gateTrigger[PORT_MAX_CHANNELS];
 
+    // Oscillator LEDs (see DroneLights): channel 0, updated every
+    // LIGHT_DIVISION samples, only when the pack-wide Oscillator LEDs
+    // option is "Follow the oscillator".
+    static const int LIGHT_DIVISION = 16;
+    dsp::ClockDivider lightDivider;
+    DroneLights oscLights;
+
     Lunar50Drone() {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
         for (int i = 0; i < NUM_OSC; i++) {
@@ -71,6 +78,49 @@ struct Lunar50Drone : Module {
 
         configParam(VOLT_PARAM, 0.f, 1.f, 0.f, "Volt (detune / FM)", "%", 0.f, 100.f);
         configInput(VOLT_CV_INPUT, "Volt CV");
+
+        lightDivider.setDivision(LIGHT_DIVISION);
+        applyDefaults();
+    }
+
+    // A new module's FM topology, mix and tone: the built-in ones, or the
+    // user's own ("Use these settings for new Lunar50Drone"). A loaded
+    // patch's dataFromJson() then overrides them with what it saved.
+    void applyDefaults() {
+        applyFmTopology(this, 0);
+        applyMixMode(this, MIX_FIXED);
+        applyTone(this, 0);
+        if (json_t* defaultsJ = copyAmbientModuleDefaults("Lunar50Drone")) {
+            dataFromJson(defaultsJ);
+            json_decref(defaultsJ);
+        }
+    }
+
+    // Initialize: same state as a new module.
+    void onReset(const ResetEvent& e) override {
+        Module::onReset(e);
+        applyDefaults();
+    }
+
+    // Menu setters, shared by the menu, its undo and "Apply to all".
+    static void applyFmTopology(engine::Module* m, int topology) {
+        Lunar50Drone* d = dynamic_cast<Lunar50Drone*>(m);
+        for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
+            d->voice[c].fmTopology = topology;
+        }
+    }
+    static void applyMixMode(engine::Module* m, int mode) {
+        dynamic_cast<Lunar50Drone*>(m)->mixMode = mode;
+    }
+    // tone: menu index, 0 = hardware, 1 = bright.
+    static void applyTone(engine::Module* m, int tone) {
+        Lunar50Drone* d = dynamic_cast<Lunar50Drone*>(m);
+        for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
+            d->voice[c].hardwareTone = (tone == 0);
+        }
+    }
+    int toneIndex() const {
+        return voice[0].hardwareTone ? 0 : 1;
     }
 
     json_t* dataToJson() override {
@@ -86,21 +136,19 @@ struct Lunar50Drone : Module {
         if (fmTopologyJ) {
             // Clamped like every other saved menu index: a corrupt or
             // hand-edited patch can't select a mode that doesn't exist.
-            int fmTopology = ambient::clampIndex(json_integer_value(fmTopologyJ), 2); // 0 = average, 1 = circular chain
-            for (int c = 0; c < PORT_MAX_CHANNELS; c++) voice[c].fmTopology = fmTopology;
+            applyFmTopology(this, ambient::clampIndex(json_integer_value(fmTopologyJ), 2)); // 0 = average, 1 = circular chain
+        } else {
+            // Older patch: the legacy mode, not the user's defaults for new modules.
+            applyFmTopology(this, 0);
         }
         json_t* mixModeJ = json_object_get(rootJ, "mixMode");
-        if (mixModeJ) {
-            mixMode = ambient::clampIndex(json_integer_value(mixModeJ), NUM_MIX_MODES);
-        }
+        applyMixMode(this, mixModeJ ? ambient::clampIndex(json_integer_value(mixModeJ), NUM_MIX_MODES) : MIX_FIXED);
         // A new instance gets the hardware tone (DroneVoice's default). A
         // patch saved before 2.5.2 has no key and keeps its bright saw, so
         // it sounds exactly as it did.
         json_t* hardwareToneJ = json_object_get(rootJ, "hardwareTone");
         bool hardwareTone = hardwareToneJ ? json_boolean_value(hardwareToneJ) : false;
-        for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
-            voice[c].hardwareTone = hardwareTone;
-        }
+        applyTone(this, hardwareTone ? 0 : 1);
     }
 
     void process(const ProcessArgs& args) override {
@@ -120,7 +168,6 @@ struct Lunar50Drone : Module {
                 params[ACTIVE_PARAM + i].setValue(params[ACTIVE_PARAM + i].getValue() > 0.f ? 0.f : 1.f);
             }
             active[i] = params[ACTIVE_PARAM + i].getValue() > 0.f;
-            lights[ACTIVE_LIGHT + i].setBrightness(active[i] ? 1.f : 0.f);
 
             mod[i] = params[MOD_PARAM + i].getValue() > 0.f;
             lights[MOD_LIGHT + i].setBrightness(mod[i] ? 1.f : 0.f);
@@ -154,12 +201,22 @@ struct Lunar50Drone : Module {
         bool gateInputConnected = inputs[GATE_INPUT].isConnected();
         float atten = params[ATTEN_PARAM].getValue();
 
+        // Plugin-wide option (Oscillator LEDs menu), read once per sample.
+        bool pitchLights = ambientPitchLights.load(std::memory_order_relaxed);
+
         float maxEnvValue = 0.f;
+        float cv0 = 0.f;
+        float volt0 = 0.f;
+        bool voice0Ran = false;
         for (int c = 0; c < channels; c++) {
             // Same CV offset (in octaves) applied to every oscillator, so it shifts
             // all 5 frequencies together while preserving the intervals between them.
             float cv = inputs[CV_INPUT].getPolyVoltage(c) * atten;
             float volt = clamp(voltParam + inputs[VOLT_CV_INPUT].getPolyVoltage(c) / 10.f, 0.f, 1.f);
+            if (c == 0) {
+                cv0 = cv;
+                volt0 = volt;
+            }
 
             float envValue;
             if (envInputConnected) {
@@ -206,12 +263,28 @@ struct Lunar50Drone : Module {
                         break;
                 }
             }
+            if (c == 0) {
+                voice0Ran = envAmount > 0.f;
+            }
 
             outputs[ENV_OUTPUT].setVoltage(envValue * 10.f, c);
             outputs[SAW_OUTPUT].setVoltage(sawOut, c);
         }
         outputs[ENV_OUTPUT].setChannels(channels);
         outputs[SAW_OUTPUT].setChannels(channels);
+
+        if (!pitchLights) {
+            // Plain on/off LEDs (2.5.1 and earlier), nothing computed.
+            for (int i = 0; i < NUM_OSC; i++) {
+                lights[ACTIVE_LIGHT + i].setBrightness(active[i] ? 1.f : 0.f);
+            }
+        } else if (lightDivider.process()) {
+            float brightness[NUM_OSC];
+            oscLights.update(voice[0], voice0Ran, LIGHT_DIVISION, args.sampleTime, pitchParams, active, mod, cv0, volt0, brightness);
+            for (int i = 0; i < NUM_OSC; i++) {
+                lights[ACTIVE_LIGHT + i].setBrightness(brightness[i]);
+            }
+        }
 
         lights[HOLD_LIGHT].setBrightness(holdActive ? 1.f : 0.f);
         lights[ENV_LIGHT].setBrightness(maxEnvValue);
@@ -265,42 +338,70 @@ struct Lunar50DroneWidget : ModuleWidget {
         Lunar50Drone* module = dynamic_cast<Lunar50Drone*>(this->module);
         assert(module);
 
-        appendAmbientThemeMenu(menu);
+        // Pack-wide settings first (theme, LEDs), then this module's own.
+        appendAmbientThemeMenu(menu, true);
+        // Plugin-wide, like the theme: saved in AmbientModules.json, not in the patch.
+        menu->addChild(createIndexSubmenuItem("Oscillator LEDs (all AmbientModules)",
+            {"Follow the oscillator", "On/off only"},
+            [=]() { return ambientPitchLights ? 0 : 1; },
+            [=](int mode) { setAmbientPitchLights(mode == 0); }
+        ));
+        menu->addChild(new MenuSeparator);
         menu->addChild(createIndexSubmenuItem("FM topology", {"Average of active others", "Circular chain"},
             [=]() { return module->voice[0].fmTopology; },
             [=](int topology) {
-                pushIntFieldChange(module, "change FM topology", module->voice[0].fmTopology, topology,
-                    [](engine::Module* m, int v) {
-                        Lunar50Drone* mm = dynamic_cast<Lunar50Drone*>(m);
-                        for (int c = 0; c < PORT_MAX_CHANNELS; c++) mm->voice[c].fmTopology = v;
-                    });
-                for (int c = 0; c < PORT_MAX_CHANNELS; c++) module->voice[c].fmTopology = topology;
+                pushIntFieldChange(module, "change FM topology", module->voice[0].fmTopology, topology, Lunar50Drone::applyFmTopology);
+                Lunar50Drone::applyFmTopology(module, topology);
             }
         ));
         menu->addChild(createIndexSubmenuItem("Oscillator mix",
             {"Fixed sum / 5 (legacy)", "Average of active oscillators", "Soft-clip saturated sum", "2 oscillators max", "3 oscillators max", "4 oscillators max"},
             [=]() { return module->mixMode; },
             [=](int mode) {
-                pushIntFieldChange(module, "change oscillator mix", module->mixMode, mode,
-                    [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->mixMode = v; });
-                module->mixMode = mode;
+                pushIntFieldChange(module, "change oscillator mix", module->mixMode, mode, Lunar50Drone::applyMixMode);
+                Lunar50Drone::applyMixMode(module, mode);
             }
         ));
         menu->addChild(createIndexSubmenuItem("Tone",
             {"Hardware (darker, measured on the Solar 50 voice)", "Bright (2.5.1 and earlier)"},
-            [=]() { return module->voice[0].hardwareTone ? 0 : 1; },
+            [=]() { return module->toneIndex(); },
             [=](int tone) {
-                pushIntFieldChange(module, "change tone", module->voice[0].hardwareTone ? 0 : 1, tone,
-                    [](engine::Module* m, int v) {
-                        Lunar50Drone* mm = dynamic_cast<Lunar50Drone*>(m);
-                        for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
-                            mm->voice[c].hardwareTone = (v == 0);
-                        }
-                    });
-                for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
-                    module->voice[c].hardwareTone = (tone == 0);
+                pushIntFieldChange(module, "change tone", module->toneIndex(), tone, Lunar50Drone::applyTone);
+                Lunar50Drone::applyTone(module, tone);
+            }
+        ));
+
+        // A blank line, lighter than a separator, before the two actions.
+        menu->addChild(createMenuLabel(""));
+        menu->addChild(createMenuItem("Apply these settings to all Lunar50Drone in the patch", "",
+            [=]() {
+                // One undo step for every module changed.
+                history::ComplexAction* complexAction = new history::ComplexAction;
+                complexAction->name = "apply Lunar50Drone settings to all";
+                for (int64_t id : APP->engine->getModuleIds()) {
+                    Lunar50Drone* other = dynamic_cast<Lunar50Drone*>(APP->engine->getModule(id));
+                    if (!other || other == module) {
+                        continue;
+                    }
+                    pushIntFieldChange(other, "change FM topology", other->voice[0].fmTopology, module->voice[0].fmTopology,
+                                       Lunar50Drone::applyFmTopology, complexAction);
+                    pushIntFieldChange(other, "change oscillator mix", other->mixMode, module->mixMode,
+                                       Lunar50Drone::applyMixMode, complexAction);
+                    pushIntFieldChange(other, "change tone", other->toneIndex(), module->toneIndex(),
+                                       Lunar50Drone::applyTone, complexAction);
+                    Lunar50Drone::applyFmTopology(other, module->voice[0].fmTopology);
+                    Lunar50Drone::applyMixMode(other, module->mixMode);
+                    Lunar50Drone::applyTone(other, module->toneIndex());
+                }
+                if (complexAction->isEmpty()) {
+                    delete complexAction;
+                } else {
+                    APP->history->push(complexAction);
                 }
             }
+        ));
+        menu->addChild(createMenuItem("Use these settings for new Lunar50Drone", "",
+            [=]() { setAmbientModuleDefaults("Lunar50Drone", module->dataToJson()); }
         ));
     }
 };

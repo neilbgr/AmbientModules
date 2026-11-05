@@ -1,5 +1,6 @@
 #pragma once
 #include <rack.hpp>
+#include <atomic>
 #include <functional>
 #include <string>
 #include <vector>
@@ -22,9 +23,19 @@ static std::string panelThemePath(const std::string& moduleName, int themeIndex)
 }
 
 extern int ambientTheme;
+// Plugin-wide too, in the same file: oscillator LEDs follow their
+// oscillator (true) or are plain on/off (false). Read by the audio thread.
+extern std::atomic<bool> ambientPitchLights;
 
-void loadAmbientTheme();
+void loadAmbientSettings();
 void setAmbientTheme(int theme);
+void setAmbientPitchLights(bool on);
+// A module's own defaults for new instances ("Use these settings for new
+// ..."), as its dataToJson(): saved in the same file, never in a patch.
+// copy: a copy the caller decrefs, nullptr if none. set: takes ownership
+// of dataJ.
+json_t* copyAmbientModuleDefaults(const std::string& slug);
+void setAmbientModuleDefaults(const std::string& slug, json_t* dataJ);
 
 // Cardinal's Engine::fromJson (src/override/Engine.cpp) creates the
 // ModuleWidget *before* calling Module::fromJson(), unlike vanilla Rack —
@@ -88,8 +99,13 @@ static inline void pushIntFieldChange(engine::Module* module, const std::string&
 // right-click menu — changes the plugin-wide ambientTheme immediately,
 // repainting every open module (old or new) since they all read the same
 // global on their next step().
-inline void appendAmbientThemeMenu(Menu* menu) {
+// globalLabel: heads it with a greyed "Global" label, for a module that
+// lists other pack-wide settings right after it.
+inline void appendAmbientThemeMenu(Menu* menu, bool globalLabel = false) {
     menu->addChild(new MenuSeparator);
+    if (globalLabel) {
+        menu->addChild(createMenuLabel("Global"));
+    }
     menu->addChild(createIndexSubmenuItem("Theme", PANEL_THEMES,
         [=]() { return ambientTheme; },
         [=](int theme) { setAmbientTheme(theme); }

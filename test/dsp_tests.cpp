@@ -1010,6 +1010,73 @@ static void testDroneTone() {
     check(finite && peak < 1.5f, "DroneVoice: hardware tone stable at 8 kHz sample rate", "peak %.2f", peak);
 }
 
+// Oscillator LEDs (DroneLights): the saw's ramp averaged over the phase
+// travelled, smoothed, then x1 (slow) to x2 (audio rate) gain.
+static void testDroneLights() {
+    const float fs = 48000.f;
+    const int div = 16;
+    float pitch[DroneVoice::NUM_OSC] = {};
+    bool active[DroneVoice::NUM_OSC] = {true, false, false, false, false};
+    bool mod[DroneVoice::NUM_OSC] = {};
+    float brightness[DroneVoice::NUM_OSC];
+
+    // 1 Hz: the LED sweeps its whole ramp, voice running or not (envelope
+    // closed: the LEDs run their own phase).
+    pitch[0] = -std::log2(dsp::FREQ_C4);
+    for (bool voiceRuns : {true, false}) {
+        DroneVoice voice;
+        DroneLights lights;
+        float lo = 1.f, hi = 0.f;
+        for (int n = 0; n < (int) fs * 3; n++) {
+            if (voiceRuns) {
+                voice.process(1.f / fs, fs, pitch, active, mod, 0.f, 0.f);
+            }
+            if (n % div == div - 1) {
+                lights.update(voice, voiceRuns, div, 1.f / fs, pitch, active, mod, 0.f, 0.f, brightness);
+                if (n > fs) {
+                    lo = std::fmin(lo, brightness[0]);
+                    hi = std::fmax(hi, brightness[0]);
+                }
+            }
+        }
+        check(lo < 0.1f && hi > 0.9f, voiceRuns ? "DroneLights: 1 Hz oscillator LED sweeps its ramp" : "DroneLights: 1 Hz LED keeps sweeping, envelope closed",
+              "min %.3f max %.3f", lo, hi);
+        if (!voiceRuns) {
+            check(voice.phase[0] == 0.f, "DroneLights: display only, the voice's phase is untouched");
+        }
+    }
+
+    // Audio rate, including exactly fs / 16 (a naive sample would freeze):
+    // steady full brightness.
+    for (float freq : {440.f, 3000.f, 2999.f, 12000.f}) {
+        pitch[0] = std::log2(freq / dsp::FREQ_C4);
+        DroneVoice voice;
+        DroneLights lights;
+        float worst = 0.f;
+        for (int n = 0; n < (int) fs; n++) {
+            voice.process(1.f / fs, fs, pitch, active, mod, 0.f, 0.f);
+            if (n % div == div - 1) {
+                lights.update(voice, true, div, 1.f / fs, pitch, active, mod, 0.f, 0.f, brightness);
+                if (n > fs / 4) {
+                    worst = std::fmax(worst, 1.f - brightness[0]);
+                }
+            }
+        }
+        char name[64];
+        std::snprintf(name, sizeof(name), "DroneLights: %.0f Hz oscillator LED glows steadily", freq);
+        check(worst < 0.04f, name, "dip below full %.4f", worst);
+    }
+
+    // Inactive: off.
+    {
+        DroneVoice voice;
+        DroneLights lights;
+        bool none[DroneVoice::NUM_OSC] = {};
+        lights.update(voice, false, div, 1.f / fs, pitch, none, mod, 0.f, 0.f, brightness);
+        check(brightness[0] == 0.f, "DroneLights: inactive oscillator LED is off");
+    }
+}
+
 int main() {
     testFilterStability();
     testFilterSelfOscillation();
@@ -1024,6 +1091,7 @@ int main() {
     testVcoSubRounding();
     testVcoSubLock();
     testDroneTone();
+    testDroneLights();
     std::printf("%s: %d failure(s)\n", failures ? "FAILED" : "OK", failures);
     return failures;
 }
