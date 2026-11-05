@@ -19,16 +19,64 @@ struct DroneVoice {
     static const int NUM_OSC = 5;
     static constexpr float DETUNE_MAX_OCTAVES = 2.f; // max detune, reached at volt = 0.5 (and held through 1)
     static constexpr float FM_DEPTH_OCTAVES = 1.f;   // max FM depth at volt = 1
+    // Hardware tone: the real voice is much darker than a pure saw. Measured
+    // on Elta Music's demo video, with one oscillator alone and the filter
+    // fully open, at 41, 100, 634 and 661 Hz. The roll-off is the same in Hz
+    // at every pitch. The best fit is two real poles (a 2-pole low-pass with
+    // Q 0.35), about 1.3 dB rms from the measured harmonics, against 6-8 dB
+    // for the plain saw.
+    static constexpr float TONE_POLE1_HZ = 1700.f;
+    static constexpr float TONE_POLE2_HZ = 10000.f;
 
     float phase[NUM_OSC] = {};
     float prevSaw[NUM_OSC] = {};
     int fmTopology = 0; // 0 = average of active others, 1 = circular chain
+    // true = hardware tone (the two poles above), false = the plain bright
+    // saw of 2.5.1 and earlier.
+    bool hardwareTone = true;
+    float toneState1 = 0.f;
+    float toneState2 = 0.f;
+    float toneSampleRate = -1.f;
+    float toneGain1 = 0.f;
+    float toneGain2 = 0.f;
+
+    // Gain of a TPT (trapezoidal, pre-warped) one-pole low-pass. The pole is
+    // kept below 0.45 fs, so tan() stays finite at low sample rates.
+    static float onePoleGain(float cutoffHz, float sampleRate) {
+        float g = std::tan((float) M_PI * std::fmin(cutoffHz, 0.45f * sampleRate) / sampleRate);
+        return g / (1.f + g);
+    }
+
+    static float onePole(float x, float& state, float gain) {
+        float v = (x - state) * gain;
+        float y = v + state;
+        state = y + v;
+        return y;
+    }
+
+    // Linear, so filtering the summed mix once is the same as filtering
+    // each of the 5 oscillators.
+    float tone(float mix, float sampleRate) {
+        if (!hardwareTone) {
+            // Track the input, so switching the tone on later starts
+            // from the current level instead of a stale state (no click).
+            toneState1 = mix;
+            toneState2 = mix;
+            return mix;
+        }
+        if (sampleRate != toneSampleRate) {
+            toneSampleRate = sampleRate;
+            toneGain1 = onePoleGain(TONE_POLE1_HZ, sampleRate);
+            toneGain2 = onePoleGain(TONE_POLE2_HZ, sampleRate);
+        }
+        return onePole(onePole(mix, toneState1, toneGain1), toneState2, toneGain2);
+    }
 
     // pitchParams: per-oscillator base pitch (octaves rel. C4).
     // active/mod: per-oscillator mute + "shared CV modulates this one" flags.
     // cv: shared pitch CV (already scaled by the attenuverter).
     // volt: VOLT knob+CV value, already clamped to 0..1 (0% = unchanged, 100% = full stroke).
-    // Returns the raw summed sawtooth mix (NOT yet divided by NUM_OSC or scaled to volts).
+    // Returns the summed sawtooth mix, after the tone (NOT yet divided by NUM_OSC or scaled to volts).
     float process(float sampleTime, float sampleRate,
                    const float pitchParams[NUM_OSC],
                    const bool active[NUM_OSC], const bool mod[NUM_OSC],
@@ -105,6 +153,6 @@ struct DroneVoice {
             prevSaw[i] = newPrevSaw[i];
         }
 
-        return mix;
+        return tone(mix, sampleRate);
     }
 };

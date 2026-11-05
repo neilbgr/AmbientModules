@@ -935,6 +935,81 @@ static void testVcoRobustness() {
     }
 }
 
+// Lunar50Drone's hardware tone: the same roll-off in Hz at every pitch
+// (measured on the hardware at 41, 100 and 634 Hz), matching the analog
+// pair of poles (1.7 kHz, 10 kHz) within 0.25 dB up to 4 kHz and 1 dB at
+// 8 kHz (the TPT poles are pre-warped, so the 10 kHz one bends slightly
+// below it at 48 kHz). Its fundamental included.
+static std::vector<float> renderDrone(double f0, bool hardwareTone, float fs, int skip, int n, int switchAt = -1) {
+    DroneVoice drone;
+    drone.hardwareTone = hardwareTone;
+    float pitches[DroneVoice::NUM_OSC] = {(float) std::log2(f0 / dsp::FREQ_C4), 0.f, 0.f, 0.f, 0.f};
+    bool active[DroneVoice::NUM_OSC] = {true, false, false, false, false};
+    bool mod[DroneVoice::NUM_OSC] = {};
+    std::vector<float> x;
+    for (int i = 0; i < skip + n; i++) {
+        if (i == switchAt) {
+            drone.hardwareTone = !drone.hardwareTone;
+        }
+        float y = drone.process(1.f / fs, fs, pitches, active, mod, 0.f, 0.f);
+        if (i >= skip) {
+            x.push_back(y);
+        }
+    }
+    return x;
+}
+
+static void testDroneTone() {
+    auto analogDb = [](double f) {
+        return -10 * std::log10(1 + std::pow(f / DroneVoice::TONE_POLE1_HZ, 2))
+               - 10 * std::log10(1 + std::pow(f / DroneVoice::TONE_POLE2_HZ, 2));
+    };
+    double worst = 0.0, top = 0.0, fundamental = 0.0;
+    const double pitches[] = {41.0, 100.4, 634.5};
+    for (double f0 : pitches) {
+        std::vector<float> dark = renderDrone(f0, true, 48000.f, 24000, 48000);
+        std::vector<float> bright = renderDrone(f0, false, 48000.f, 24000, 48000);
+        fundamental = std::fmax(fundamental, std::fabs(20 * std::log10(toneAmplitude(dark, f0) / toneAmplitude(bright, f0)) - analogDb(f0)));
+        const double bands[] = {1000.0, 2500.0, 4000.0};
+        for (double f : bands) {
+            double h = std::round(f / f0) * f0;
+            double db = 20 * std::log10(toneAmplitude(dark, h) / toneAmplitude(bright, h));
+            worst = std::fmax(worst, std::fabs(db - analogDb(h)));
+        }
+        double h8 = std::round(8000.0 / f0) * f0;
+        top = std::fmax(top, std::fabs(20 * std::log10(toneAmplitude(dark, h8) / toneAmplitude(bright, h8)) - analogDb(h8)));
+    }
+    check(worst < 0.25 && top < 1.0, "DroneVoice: hardware tone = 1.7 kHz + 10 kHz poles at 41/100/634 Hz",
+          "worst %.2f dB to 4 kHz, %.2f dB at 8 kHz", worst, top);
+    check(fundamental < 0.05, "DroneVoice: hardware tone at the fundamental as the analog poles", "%.3f dB", fundamental);
+
+    // Switching the tone on or off mid-note: no step larger than the saw's
+    // own steps (its edge is 2).
+    for (int on = 0; on < 2; on++) {
+        std::vector<float> x = renderDrone(100.4, on == 1, 48000.f, 0, 24000, 12000);
+        float worstJump = 0.f;
+        for (int i = 11990; i < 12010; i++) {
+            float d = std::fabs(x[i + 1] - x[i]);
+            // Ignore the saw's own edge, which can fall in the window.
+            if (d < 1.f) {
+                worstJump = std::fmax(worstJump, d);
+            }
+        }
+        check(worstJump < 0.2f, on ? "DroneVoice: tone switched off mid-note without a click" : "DroneVoice: tone switched on mid-note without a click",
+              "largest step %.3f", worstJump);
+    }
+
+    // Low sample rate: the 10 kHz pole is held below 0.45 fs, still stable.
+    std::vector<float> low = renderDrone(1000.0, true, 8000.f, 0, 8000);
+    float peak = 0.f;
+    bool finite = true;
+    for (float v : low) {
+        finite = finite && std::isfinite(v);
+        peak = std::fmax(peak, std::fabs(v));
+    }
+    check(finite && peak < 1.5f, "DroneVoice: hardware tone stable at 8 kHz sample rate", "peak %.2f", peak);
+}
+
 int main() {
     testFilterStability();
     testFilterSelfOscillation();
@@ -948,6 +1023,7 @@ int main() {
     testVcoRobustness();
     testVcoSubRounding();
     testVcoSubLock();
+    testDroneTone();
     std::printf("%s: %d failure(s)\n", failures ? "FAILED" : "OK", failures);
     return failures;
 }

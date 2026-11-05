@@ -77,6 +77,7 @@ struct Lunar50Drone : Module {
         json_t* rootJ = json_object();
         json_object_set_new(rootJ, "fmTopology", json_integer(voice[0].fmTopology));
         json_object_set_new(rootJ, "mixMode", json_integer(mixMode));
+        json_object_set_new(rootJ, "hardwareTone", json_boolean(voice[0].hardwareTone));
         return rootJ;
     }
 
@@ -91,6 +92,14 @@ struct Lunar50Drone : Module {
         json_t* mixModeJ = json_object_get(rootJ, "mixMode");
         if (mixModeJ) {
             mixMode = ambient::clampIndex(json_integer_value(mixModeJ), NUM_MIX_MODES);
+        }
+        // A new instance gets the hardware tone (DroneVoice's default). A
+        // patch saved before 2.5.2 has no key and keeps its bright saw, so
+        // it sounds exactly as it did.
+        json_t* hardwareToneJ = json_object_get(rootJ, "hardwareTone");
+        bool hardwareTone = hardwareToneJ ? json_boolean_value(hardwareToneJ) : false;
+        for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
+            voice[c].hardwareTone = hardwareTone;
         }
     }
 
@@ -275,6 +284,22 @@ struct Lunar50DroneWidget : ModuleWidget {
                 pushIntFieldChange(module, "change oscillator mix", module->mixMode, mode,
                     [](engine::Module* m, int v) { dynamic_cast<Lunar50Drone*>(m)->mixMode = v; });
                 module->mixMode = mode;
+            }
+        ));
+        menu->addChild(createIndexSubmenuItem("Tone",
+            {"Hardware (darker, measured on the Solar 50 voice)", "Bright (2.5.1 and earlier)"},
+            [=]() { return module->voice[0].hardwareTone ? 0 : 1; },
+            [=](int tone) {
+                pushIntFieldChange(module, "change tone", module->voice[0].hardwareTone ? 0 : 1, tone,
+                    [](engine::Module* m, int v) {
+                        Lunar50Drone* mm = dynamic_cast<Lunar50Drone*>(m);
+                        for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
+                            mm->voice[c].hardwareTone = (v == 0);
+                        }
+                    });
+                for (int c = 0; c < PORT_MAX_CHANNELS; c++) {
+                    module->voice[c].hardwareTone = (tone == 0);
+                }
             }
         ));
     }

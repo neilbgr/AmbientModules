@@ -67,7 +67,7 @@ The modules try to stay as faithful to the hardware as possible. As far as I kno
 
 ![Solar42-patch.vcv](docs/images/Solar42-Patch.png)
 
-[**Solar42-patch.vcv**](patches/Solar42-patch.vcv) — a full-rack patch reassembling the SOLAR 42F's own architecture out of these modules: 4× Lunar50Drone (Drone 1/2/4/5, Oscillator mix set to *Fixed sum / 5 (legacy)* to match the real hardware's mixing) and 2× LunarPapaSrapa (Drone 3/6) gated from LunarPads, 2× LunarVCO (VCO A/B, cross-modulating each other's FM and both driven from the same MIDI keyboard), all summed through LunarMixer and into LunarFilter (Filter L's cutoff modulated by a LunarLFO, Filter R's by a MIDI CC) before audio output, plus LunarSequencer/LunarLFO/LunarJoystick for modulation and an unpatched LunarDetector included alongside for reference. Uses Rack's own core MIDI-CV/Audio modules (not Cardinal-specific ones), so it opens equally well in standalone VCV Rack or in Cardinal (drag the file onto the window, or File → Open) — a patch saved from Cardinal using its own Host MIDI/Audio modules would only open back in Cardinal, not standalone Rack.
+[**Solar42-patch.vcv**](patches/Solar42-patch.vcv) — a full-rack patch reassembling the SOLAR 42F's own architecture out of these modules: 4× Lunar50Drone (Drone 1/2/4/5, Oscillator mix set to *Fixed sum / 5 (legacy)* and Tone to *Hardware*, to match the real hardware's mixing and tone) and 2× LunarPapaSrapa (Drone 3/6) gated from LunarPads, 2× LunarVCO (VCO A/B, cross-modulating each other's FM and both driven from the same MIDI keyboard), all summed through LunarMixer and into LunarFilter (Filter L's cutoff modulated by a LunarLFO, Filter R's by a MIDI CC) before audio output, plus LunarSequencer/LunarLFO/LunarJoystick for modulation and an unpatched LunarDetector included alongside for reference. Uses Rack's own core MIDI-CV/Audio modules (not Cardinal-specific ones), so it opens equally well in standalone VCV Rack or in Cardinal (drag the file onto the window, or File → Open) — a patch saved from Cardinal using its own Host MIDI/Audio modules would only open back in Cardinal, not standalone Rack.
 
 [View the patch's diagram in VCV Patch Tools](https://neilbgr.github.io/VcvPatchTools/?url=https://github.com/neilbgr/AmbientModules/blob/main/patches/Solar42-patch.vcv), a web app that draws what a VCV Rack or Cardinal patch does, right in the browser.
 
@@ -221,8 +221,20 @@ Five simple sawtooth oscillators sharing one output and one envelope — the Cla
     - *Average of active oscillators*: keeps output level constant regardless of how many oscillators are active.
     - *Soft-clip saturated sum*: sums them and soft-clips, for a driven, denser tone.
     - *2/3/4 oscillators max*: a fixed divisor, like the legacy mode but calibrated for that many active oscillators, so 2/3/4 oscillators driven hard hit full level without needing all 5 active.
+- **Tone**
+  - *Hardware*: the darker tone of the real Classic Solar 50 voice. It was measured on Elta Music's demo, with one oscillator alone and the filter fully open, at 41, 100 and 634 Hz. The roll-off is fixed in Hz, whatever the pitch: about −9 dB at 4 kHz and −16 dB at 8 kHz against a plain sawtooth. This is the default for a new module.
+  - *Bright (2.5.1 and earlier)*: the plain sawtooth. Patches saved before 2.5.2 open in this mode, so they sound exactly as before.
 
-![Lunar50Drone FM topology submenu](docs/images/Lunar50Drone_Menu_FMTypologies.png) ![Lunar50Drone Oscillator mix submenu](docs/images/Lunar50Drone_Menu_Mix.png)
+![Lunar50Drone FM topology submenu](docs/images/Lunar50Drone_Menu_FMTypologies.png) ![Lunar50Drone Oscillator mix submenu](docs/images/Lunar50Drone_Menu_Mix.png) ![Lunar50Drone Tone submenu](docs/images/Lunar50Drone_Menu_Tone.png)
+
+🎹 **Factory presets** (Preset ▸ Factory presets)
+- The SOLAR 42F's spirit stays microtonal and approximate: its oscillators are tuned by ear, not to a scale. These presets are only a starting point, for those who want chords from Western harmony.
+- 19 standard chords on each of the 12 roots (C3 to B3), as *voicing ▸ root ▸ group ▸ chord*. The groups are *Triads* (major, minor, dim, aug, sus2, sus4, power), *Sevenths* (maj7, 7, m7, m7b5, dim7, mMaj7), *Sixths and added* (6, m6, add9) and *Ninths* (9, maj9, m9).
+- Each chord comes in two voicings:
+  - *Full (5 oscillators)*: a bass an octave below, under the chord from the root. Triads add the upper octave; ninths drop the upper root (bass, then 3rd, 5th, 7th, 9th). C major = C2 C3 E3 G3 C4.
+  - *Close (chord notes only)*: the chord in close position from the root, with only as many oscillators on as it has notes.
+- A preset only sets each oscillator's frequency, active state and modulation. The envelope, Volt, Hold, the CV attenuverter and the context-menu options stay as they are.
+- Modulation is lit on all 5 oscillators, so a V/oct keyboard on **Frequency CV** transposes the whole chord from its preset root (0V = no transposition). An oscillator left off sits on the root, so turning it on adds an in-tune note.
 
 > [!TIP]
 > **Patch ideas**
@@ -755,11 +767,13 @@ Build the plugin like any other Rack plugin, with `RACK_DIR` pointing at the Rac
 make RACK_DIR=/path/to/Rack-SDK
 ```
 
-`make test` builds and runs the DSP unit tests (`test/dsp_tests.cpp`): they cover LunarFilter's Polivoks-style filter (stability, ring-down, self-oscillation pitch and level, recovery from NaN/inf input), the AR and ADSR envelopes, the shared math helpers, LunarPapaSrapa's modulator, and LunarVCO's oscillator (aliasing measured for every waveform, frequency cap, pulse width at 0/100%, sub rounding and locking, robustness under through-zero FM and hard sync). They are compiled against `src/dsp` and the Rack SDK headers only, with the same math flags as the plugin build, without running the Rack engine. They use the host `g++` when there is one, otherwise MinGW (a static `.exe`, run through WSL's Windows interop):
+`make test` builds and runs the DSP unit tests (`test/dsp_tests.cpp`): they cover LunarFilter's Polivoks-style filter (stability, ring-down, self-oscillation pitch and level, recovery from NaN/inf input), the AR and ADSR envelopes, the shared math helpers, LunarPapaSrapa's modulator, and LunarVCO's oscillator (aliasing measured for every waveform, frequency cap, pulse width at 0/100%, sub rounding and locking, robustness under through-zero FM and hard sync), and Lunar50Drone's hardware tone (roll-off at every pitch, no click when switched). They are compiled against `src/dsp` and the Rack SDK headers only, with the same math flags as the plugin build, without running the Rack engine. They use the host `g++` when there is one, otherwise MinGW (a static `.exe`, run through WSL's Windows interop):
 
 ```sh
 make test RACK_DIR=/path/to/Rack-SDK
 ```
+
+Lunar50Drone's factory chord presets (`presets/Lunar50Drone/`) are generated: edit the chord tables in `scripts/generate-lunar50drone-presets.py`, then run it (Python 3, no dependencies). It rewrites the whole folder.
 
 ## AI disclosure
 
