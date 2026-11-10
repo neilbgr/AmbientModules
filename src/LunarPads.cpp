@@ -44,6 +44,8 @@ struct LunarPads : Module {
                 "Patch the matching gate output into that voice's Gate input";
             configInput(GATE_INPUT + i, string::f("%s external gate (e.g. MIDI)", labels[i]));
             configOutput(GATE_OUTPUT + i, string::f("%s gate", labels[i]));
+            // Module bypass: external gates pass straight through, pads ignored.
+            configBypass(GATE_INPUT + i, GATE_OUTPUT + i);
         }
     }
 

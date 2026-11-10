@@ -127,6 +127,8 @@ struct LunarSequencer : Module {
         configOutput(CLOCK_OUTPUT, "Clock Out");
         configOutput(CV_OUTPUT, "Step CV");
         configOutput(GATE_OUTPUT, "Step gate");
+        // Module bypass: an external clock still reaches downstream modules.
+        configBypass(CLOCK_INPUT, CLOCK_OUTPUT);
 
         for (int i = 0; i < NUM_STEPS; i++) {
             configParam<StepCvQuantity>(STEP_CV_PARAM + i, 0.f, 1.f, 0.f, string::f("Step %d CV", i + 1));

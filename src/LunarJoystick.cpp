@@ -78,6 +78,10 @@ struct LunarJoystick : Module {
         configInput(Y_INPUT, "Y (overrides the Y knob when patched)");
         configOutput(X_OUTPUT, "X");
         configOutput(Y_OUTPUT, "Y");
+        // Module bypass: patched X/Y CV passes through raw (no range, offset
+        // or smoothing).
+        configBypass(X_INPUT, X_OUTPUT);
+        configBypass(Y_INPUT, Y_OUTPUT);
     }
 
     // Same defensive rounding as LunarSequencer's STAGES_PARAM read
