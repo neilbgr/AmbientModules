@@ -127,6 +127,10 @@ struct LunarFilter : Module {
         configOutput(OUT_R_OUTPUT, "Right");
         configOutput(SEND_L_OUTPUT, "Insert send L (poly: 2ch L+R bus when Send/Return I/O is set to 1 poly jack)");
         configOutput(SEND_R_OUTPUT, "Insert send R");
+        // Module bypass (Ctrl+E): Rack's engine copies IN L/R straight to
+        // OUT L/R (all channels, unfiltered); the Send outputs go silent.
+        configBypass(IN_L_INPUT, OUT_L_OUTPUT);
+        configBypass(IN_R_INPUT, OUT_R_OUTPUT);
 
         leftExpander.producerMessage = new FilterExpanderMessage;
         leftExpander.consumerMessage = new FilterExpanderMessage;
