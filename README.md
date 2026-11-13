@@ -496,6 +496,9 @@ A classic, Buchla-inspired 3-to-5-stage sequential voltage source: each step sto
 
 ![LunarSequencer CV Range submenu](docs/images/LunarSequencer_Menu_CvRanges.png)
 
+> [!NOTE]
+> Bypassing the module passes Clock In straight to Clock Out (no output without an external clock).
+
 > [!TIP]
 > **Patch ideas**
 > - Feed Step CV into [LunarVCO](#lunarvco) or [Lunar50Drone](#lunar50drone)'s pitch/frequency input, and Step gate into their Gate input, for a self-contained melodic sequence.
@@ -643,6 +646,9 @@ The real hardware only exposes one CV input (Filter L's frequency only); this mo
     - Send L/Return L instead carry a 2-channel poly cable each (L=channel 0, R=channel 1).
     - Lets a genuinely polyphonic external module (e.g. Fundamental's own VCF, which has a single poly cable in/out and no L/R jacks at all) sit directly in the insert loop without extra merge/split utility modules.
 
+> [!NOTE]
+> Bypassing the module passes IN L/R straight to OUT L/R; the Send outputs go silent.
+
 > [!TIP]
 > **Patch ideas**
 > - Feed [LunarMixer](#lunarmixer)'s Left/Right outputs directly into In L/R for the hardware's full Mixer → Filter chain.
@@ -694,6 +700,9 @@ Electrical equivalent of the SOLAR 42F Joystick block, without the physical stic
   - Deliberately short enough to be imperceptible by hand, not a real slew/portamento effect.
   - The displayed crosshair itself isn't smoothed, only this output.
 
+> [!NOTE]
+> Bypassing the module passes the X/Y inputs straight to the X/Y outputs, without range, offset or smoothing.
+
 > [!TIP]
 > **Patch ideas**
 > - Patch X and Y into two parameters you want to move together by hand (e.g. [Lunar50Drone](#lunar50drone)'s Volt and [LunarVCO](#lunarvco)'s Shape) for a single 2D "macro" control.
@@ -735,6 +744,9 @@ The SOLAR 42F's "DRONE KEYS" pushbutton grid: 6 square pads triggering the 6 dro
   - Checked: clicking a pad toggles it on/off instead of requiring it to be held.
 
 ![LunarPads Latch mode menu](docs/images/LunarPads_Menu.png)
+
+> [!NOTE]
+> Bypassing the module passes each external gate input straight to its gate output.
 
 > [!TIP]
 > **Patch ideas**
